@@ -5,33 +5,14 @@ use std::time::Instant;
 use eframe::egui;
 
 use super::config;
-use super::keybinds;
-use super::model::{ApplyReport, Baseline, OutputInfo, Task, TaskAction, TaskResult};
-use super::output;
+use super::model::{ApplyReport, Effect, Task, TaskResult};
 
 pub enum WorkerRequest {
-    Refresh,
-    ScanOutputs,
     ApplyTasks(Vec<Task>),
-    ApplyMode { output: String, spec: String },
-    RevertMode { output: String, spec: String },
 }
 
 pub enum WorkerEvent {
-    Baseline(Result<Baseline, String>),
-    Outputs(Result<Vec<OutputInfo>, String>),
-    Applied {
-        report: ApplyReport,
-        baseline: Result<Baseline, String>,
-    },
-    ModeApplied {
-        output: String,
-        result: Result<(), String>,
-    },
-    ModeReverted {
-        output: String,
-        result: Result<(), String>,
-    },
+    Applied { report: ApplyReport },
 }
 
 pub struct WorkerHandle {
@@ -71,20 +52,8 @@ impl WorkerHandle {
 
 fn handle(request: WorkerRequest) -> WorkerEvent {
     match request {
-        WorkerRequest::Refresh => WorkerEvent::Baseline(config::load_baseline()),
-        WorkerRequest::ScanOutputs => WorkerEvent::Outputs(output::scan()),
-        WorkerRequest::ApplyTasks(tasks) => {
-            let report = apply_tasks(&tasks);
-            let baseline = config::load_baseline();
-            WorkerEvent::Applied { report, baseline }
-        }
-        WorkerRequest::ApplyMode { output, spec } => WorkerEvent::ModeApplied {
-            result: run_wlr_randr(&output, &spec),
-            output,
-        },
-        WorkerRequest::RevertMode { output, spec } => WorkerEvent::ModeReverted {
-            result: run_wlr_randr(&output, &spec),
-            output,
+        WorkerRequest::ApplyTasks(tasks) => WorkerEvent::Applied {
+            report: apply_tasks(&tasks),
         },
     }
 }
@@ -93,135 +62,73 @@ fn apply_tasks(tasks: &[Task]) -> ApplyReport {
     let started = Instant::now();
     let mut report = ApplyReport::default();
 
-    let file_tasks: Vec<&Task> = tasks
-        .iter()
-        .filter(|task| matches!(task.action, TaskAction::WriteFile { .. }))
-        .collect();
+    for task in tasks {
+        let mut warnings = Vec::new();
+        let mut error = None;
 
-    for task in &file_tasks {
-        if let TaskAction::WriteFile {
-            path,
-            contents,
-            expected,
-        } = &task.action
-        {
-            let outcome = config::write_file_if_unchanged(path, expected.as_deref(), contents);
-            report.results.push(result_for(task, &outcome));
-            if outcome.is_ok() {
-                report.files.push(path.display().to_string());
-            }
-        }
-    }
-
-    let keybind_tasks: Vec<&Task> = tasks
-        .iter()
-        .filter(|task| {
-            matches!(
-                task.action,
-                TaskAction::KeybindAdd { .. } | TaskAction::KeybindRemove { .. }
-            )
-        })
-        .collect();
-
-    if !keybind_tasks.is_empty() {
-        let path = config::rc_path();
-        let outcome = (|| -> Result<(), String> {
-            let raw = std::fs::read_to_string(&path)
-                .map_err(|err| crate::trf!("failed_to_read", path.display(), err))?;
-            let mut additions = Vec::new();
-            let mut remove_keys: Vec<String> = Vec::new();
-
-            for task in &keybind_tasks {
-                match &task.action {
-                    TaskAction::KeybindAdd {
-                        key,
-                        attrs,
-                        actions,
-                        replace,
-                    } => {
-                        additions.push(keybinds::Addition {
-                            key: key.clone(),
-                            attrs: attrs.clone(),
-                            actions: actions.clone(),
-                        });
-                        if *replace && !remove_keys.contains(key) {
-                            remove_keys.push(key.clone());
+        for effect in &task.effects {
+            match effect {
+                Effect::WriteFile {
+                    path,
+                    contents,
+                    expected,
+                } => {
+                    if let Err(err) =
+                        config::write_file_if_unchanged(path, expected.as_deref(), contents)
+                    {
+                        error = Some(err);
+                        break;
+                    }
+                }
+                Effect::RunCommand {
+                    program,
+                    args,
+                    best_effort,
+                } => {
+                    if let Err(err) = run_command(program, args) {
+                        if *best_effort {
+                            warnings.push(err);
+                        } else {
+                            error = Some(err);
+                            break;
                         }
                     }
-                    TaskAction::KeybindRemove { key } => {
-                        if !remove_keys.contains(key) {
-                            remove_keys.push(key.clone());
-                        }
-                    }
-                    _ => {}
                 }
             }
-
-            let patched = keybinds::patch(&raw, &additions, &remove_keys)?;
-            config::atomic_write(&path, &patched)
-        })();
-
-        for task in &keybind_tasks {
-            report.results.push(result_for(task, &outcome));
         }
-        if outcome.is_ok() {
-            report.files.push(path.display().to_string());
-            report.reconfigure_error = reconfigure_labwc().err();
-        }
+
+        let ok = error.is_none();
+        report.results.push(TaskResult {
+            id: task.id.clone(),
+            module_id: task.module_id,
+            title: task.title.clone(),
+            change_count: task.change_count,
+            ok,
+            error,
+        });
+        report.warnings.extend(warnings);
     }
 
     report.elapsed_ms = started.elapsed().as_millis();
     report
 }
 
-fn result_for(task: &Task, outcome: &Result<(), String>) -> TaskResult {
-    TaskResult {
-        id: task.id.clone(),
-        module: task.module,
-        title: task.title.clone(),
-        change_count: task.change_count,
-        ok: outcome.is_ok(),
-        error: outcome.as_ref().err().cloned(),
-    }
-}
-
-fn reconfigure_labwc() -> Result<(), String> {
-    if let Ok(output) = ProcessCommand::new("labwc").arg("--reconfigure").output() {
-        if output.status.success() {
-            return Ok(());
-        }
-    }
-
-    let output = ProcessCommand::new("pkill")
-        .args(["-HUP", "-x", "labwc"])
+fn run_command(program: &str, args: &[String]) -> Result<(), String> {
+    let output = ProcessCommand::new(program)
+        .args(args)
         .output()
-        .map_err(|err| crate::trf!("failed_to_invoke_pkill", err))?;
+        .map_err(|err| crate::trf!("failed_to_run_command", program, err))?;
+
     if output.status.success() {
-        Ok(())
-    } else {
-        Err(crate::trf!(
-            "pkill_hup_labwc_failed",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
-    }
-}
-
-fn run_wlr_randr(output: &str, spec: &str) -> Result<(), String> {
-    let result = ProcessCommand::new("wlr-randr")
-        .args(["--output", output, "--mode", spec])
-        .output()
-        .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
-
-    if result.status.success() {
         return Ok(());
     }
 
-    let stderr = String::from_utf8_lossy(&result.stderr);
-    let stdout = String::from_utf8_lossy(&result.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
     let detail = if stderr.trim().is_empty() {
         stdout.trim()
     } else {
         stderr.trim()
     };
-    Err(crate::trf!("wlr_randr_failed_to_switch_modes", detail))
+    Err(crate::trf!("command_failed", program, detail))
 }

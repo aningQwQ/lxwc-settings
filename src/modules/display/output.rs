@@ -1,6 +1,6 @@
 use std::process::Command as ProcessCommand;
 
-use super::model::{Mode, OutputInfo};
+use super::{Mode, OutputInfo};
 
 pub fn scan() -> Result<Vec<OutputInfo>, String> {
     let output = ProcessCommand::new("wlr-randr")

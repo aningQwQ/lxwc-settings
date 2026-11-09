@@ -1,148 +1,18 @@
 use std::collections::HashMap;
-use std::time::{Duration, Instant};
 
 use eframe::egui;
 
-use crate::core::keybinds;
-use crate::core::model::*;
+use crate::core::model::{ApplyReport, Task};
 use crate::core::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::i18n::{self, t, Lang};
-use crate::modules::{self, SettingsModule};
+use crate::modules::{self, ModuleCtx, SettingsModule, StatusMessage};
 use crate::ui::{sidebar, status_bar, theme};
-
-pub const WATCHDOG_SECONDS: u64 = 15;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KeybindView {
-    Edit,
-    Existing,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum KeyPickTab {
-    Letters,
-    Digits,
-    Function,
-    Navigation,
-    Symbols,
-    Media,
-}
-
-#[derive(Clone, Debug)]
-pub struct KeybindForm {
-    pub key: String,
-    pub action: String,
-    pub command: String,
-    pub attrs: String,
-    pub advanced: bool,
-    pub advanced_xml: String,
-    pub editing_original: Option<String>,
-    pub error: Option<String>,
-}
-
-impl Default for KeybindForm {
-    fn default() -> Self {
-        Self {
-            key: String::new(),
-            action: "Execute".to_string(),
-            command: String::new(),
-            attrs: String::new(),
-            advanced: false,
-            advanced_xml: String::new(),
-            editing_original: None,
-            error: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct StatusMessage {
-    pub text: String,
-    pub error: bool,
-}
-
-impl StatusMessage {
-    pub fn info(text: impl Into<String>) -> Self {
-        Self {
-            text: text.into(),
-            error: false,
-        }
-    }
-
-    pub fn error(text: impl Into<String>) -> Self {
-        Self {
-            text: text.into(),
-            error: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct PendingModeChange {
-    pub mode: Mode,
-    pub previous: Option<Mode>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Watchdog {
-    pub output: String,
-    pub mode: Mode,
-    pub previous: Mode,
-    pub deadline: Instant,
-}
-
-impl Watchdog {
-    pub fn remaining_secs(&self) -> u32 {
-        self.deadline
-            .saturating_duration_since(Instant::now())
-            .as_secs_f32()
-            .ceil() as u32
-    }
-
-    pub fn fraction(&self) -> f32 {
-        (self.remaining_secs() as f32 / WATCHDOG_SECONDS as f32).clamp(0.0, 1.0)
-    }
-}
-
-pub fn keybind_remove_id(key: &str) -> String {
-    format!("kb:remove:{}", keybinds::normalize_key(key))
-}
-
-pub fn keybind_add_id(edit: &KeybindEdit) -> String {
-    format!(
-        "kb:add:{}:{}",
-        keybinds::normalize_key(&edit.key),
-        keybinds::render_actions(&edit.actions)
-    )
-}
-
-pub fn attrs_to_input(attrs: &[(String, String)]) -> String {
-    attrs
-        .iter()
-        .map(|(key, value)| format!("{key}=\"{value}\""))
-        .collect::<Vec<_>>()
-        .join(" ")
-}
 
 pub struct App {
     worker: WorkerHandle,
-    pub baseline: Option<Baseline>,
-    pub outputs: Vec<OutputInfo>,
-    pub outputs_error: Option<String>,
-    pub scanning: bool,
-    pub current: ModuleKind,
+    pub modules: Vec<Box<dyn SettingsModule>>,
+    pub current: usize,
     pub lang: Lang,
-    env: Box<dyn SettingsModule>,
-    pub keybind_form: KeybindForm,
-    pub keybind_edits: Vec<KeybindEdit>,
-    pub keybind_deletions: Vec<String>,
-    pub keybind_filter: String,
-    pub keybind_view: KeybindView,
-    pub keybind_pick_tab: KeyPickTab,
-    pub selected_output: Option<String>,
-    pub selected_mode: Option<Mode>,
-    pub mode_inflight: Option<PendingModeChange>,
-    pub watchdog: Option<Watchdog>,
     pub confirm_open: bool,
     pub applying: bool,
     pub failures: HashMap<String, String>,
@@ -150,8 +20,6 @@ pub struct App {
     pub status: Option<StatusMessage>,
     pub report: Option<ApplyReport>,
     pub report_open: bool,
-    reset_on_baseline: bool,
-    reset_modes_on_scan: bool,
 }
 
 impl App {
@@ -159,121 +27,44 @@ impl App {
         let lang = i18n::initial();
         i18n::set_current(lang);
 
-        let mut env: Box<dyn SettingsModule> = Box::new(modules::env::EnvModule::new());
-        env.refresh();
+        let mut modules: Vec<Box<dyn SettingsModule>> = vec![
+            Box::new(modules::display::DisplayModule::new(ctx)),
+            Box::new(modules::env::EnvModule::new()),
+            Box::new(modules::keybind::KeybindModule::new()),
+        ];
+        for module in &mut modules {
+            module.refresh();
+        }
 
         let worker = WorkerHandle::spawn(ctx.clone());
-        let app = Self {
+        Self {
             worker,
-            baseline: None,
-            outputs: Vec::new(),
-            outputs_error: None,
-            scanning: true,
-            current: ModuleKind::Display,
+            modules,
+            current: 0,
             lang,
-            env,
-            keybind_form: KeybindForm::default(),
-            keybind_edits: Vec::new(),
-            keybind_deletions: Vec::new(),
-            keybind_filter: String::new(),
-            keybind_view: KeybindView::Existing,
-            keybind_pick_tab: KeyPickTab::Letters,
-            selected_output: None,
-            selected_mode: None,
-            mode_inflight: None,
-            watchdog: None,
             confirm_open: false,
             applying: false,
             failures: HashMap::new(),
             pending: Vec::new(),
-            status: None,
+            status: Some(StatusMessage::info(t("ready"))),
             report: None,
             report_open: false,
-            reset_on_baseline: true,
-            reset_modes_on_scan: false,
-        };
-        app.worker.send(WorkerRequest::Refresh);
-        app.worker.send(WorkerRequest::ScanOutputs);
-        app
+        }
     }
 
     fn poll_events(&mut self) {
-        while let Some(event) = self.worker.try_recv() {
-            match event {
-                WorkerEvent::Baseline(result) => self.on_baseline(result),
-                WorkerEvent::Outputs(result) => self.on_outputs(result),
-                WorkerEvent::Applied { report, baseline } => self.on_applied(report, baseline),
-                WorkerEvent::ModeApplied { output, result } => self.on_mode_applied(output, result),
-                WorkerEvent::ModeReverted { output, result } => {
-                    self.status = Some(match result {
-                        Ok(()) => StatusMessage::info(crate::trf!(
-                            "restored_to_its_previous_mode",
-                            output
-                        )),
-                        Err(err) => StatusMessage::error(crate::trf!("restore_failed", err)),
-                    });
-                    self.worker.send(WorkerRequest::ScanOutputs);
-                }
-            }
+        while let Some(WorkerEvent::Applied { report }) = self.worker.try_recv() {
+            self.on_applied(report);
         }
     }
 
-    fn on_baseline(&mut self, result: Result<Baseline, String>) {
-        match result {
-            Ok(baseline) => {
-                let reset = self.reset_on_baseline || self.baseline.is_none();
-                self.reset_on_baseline = false;
-                self.adopt_baseline(baseline, reset);
-                self.status = Some(StatusMessage::info(t("configuration_reloaded")));
-            }
-            Err(err) => {
-                self.status = Some(StatusMessage::error(crate::trf!(
-                    "failed_to_read_configuration",
-                    err
-                )));
-            }
-        }
-    }
-
-    fn on_outputs(&mut self, result: Result<Vec<OutputInfo>, String>) {
-        self.scanning = false;
-        let reset_modes = std::mem::take(&mut self.reset_modes_on_scan);
-        match result {
-            Ok(outputs) => {
-                self.outputs_error = None;
-                self.outputs = outputs;
-                let still_exists = self
-                    .selected_output
-                    .as_ref()
-                    .map(|name| self.outputs.iter().any(|item| &item.name == name))
-                    .unwrap_or(false);
-                if !still_exists {
-                    self.selected_output = self
-                        .outputs
-                        .iter()
-                        .find(|item| item.enabled)
-                        .or_else(|| self.outputs.first())
-                        .map(|item| item.name.clone());
-                    self.selected_mode = None;
-                }
-                if reset_modes {
-                    self.selected_mode = None;
-                }
-                self.sync_selected_mode();
-            }
-            Err(err) => {
-                self.outputs_error = Some(err.clone());
-                self.status = Some(StatusMessage::error(crate::trf!(
-                    "display_scan_failed",
-                    err
-                )));
-            }
-        }
-    }
-
-    fn on_applied(&mut self, report: ApplyReport, baseline: Result<Baseline, String>) {
+    fn on_applied(&mut self, report: ApplyReport) {
         self.applying = false;
-        self.env.on_applied(&report);
+
+        for module in &mut self.modules {
+            module.on_applied(&report);
+        }
+
         self.failures.clear();
         for result in &report.results {
             if !result.ok {
@@ -283,196 +74,22 @@ impl App {
             }
         }
 
-        let keybind_results: Vec<&TaskResult> = report
-            .results
-            .iter()
-            .filter(|result| result.module == ModuleKind::Keybind)
-            .collect();
-        if !keybind_results.is_empty() && keybind_results.iter().all(|result| result.ok) {
-            self.keybind_edits.clear();
-            self.keybind_deletions.clear();
-            self.keybind_form.editing_original = None;
-            self.keybind_form.key.clear();
-            self.keybind_form.error = None;
-        }
-
-        let reload_error = match baseline {
-            Ok(baseline) => {
-                self.adopt_baseline(baseline, false);
-                None
-            }
-            Err(err) => Some(err),
-        };
-
         let success = report.success_count();
         let failure = report.failure_count();
+        let warnings = report.warnings.len();
         let mut text = crate::trf!("done_succeeded", success);
         if failure > 0 {
             text.push_str(&crate::trf!("failed_kept_in_queue", failure));
         }
-        if let Some(err) = &report.reconfigure_error {
-            text.push_str(&crate::trf!("labwc_reload_failed_2", err));
-        }
-        if let Some(err) = &reload_error {
-            text.push_str(&crate::trf!("failed_to_reload_configuration", err));
+        if warnings > 0 {
+            text.push_str(&crate::trf!("warnings_suffix", warnings));
         }
         self.status = Some(StatusMessage {
             text,
-            error: failure > 0 || report.reconfigure_error.is_some() || reload_error.is_some(),
+            error: failure > 0,
         });
-        self.report_open = failure > 0 || report.reconfigure_error.is_some();
+        self.report_open = failure > 0 || warnings > 0;
         self.report = Some(report);
-    }
-
-    fn on_mode_applied(&mut self, output: String, result: Result<(), String>) {
-        let pending = self.mode_inflight.take();
-        match result {
-            Ok(()) => {
-                self.selected_output = Some(output.clone());
-                self.sync_selected_mode();
-                let previous = pending.as_ref().and_then(|item| item.previous.clone());
-                let requested = pending.as_ref().map(|item| item.mode.clone());
-                match (previous, requested) {
-                    (Some(previous), Some(mode)) => {
-                        self.watchdog = Some(Watchdog {
-                            output: output.clone(),
-                            mode: mode.clone(),
-                            previous,
-                            deadline: Instant::now() + Duration::from_secs(WATCHDOG_SECONDS),
-                        });
-                        self.status = Some(StatusMessage::info(crate::trf!(
-                            "switched_to_confirm_within_seconds_or_it_will_roll_back",
-                            mode.label(),
-                            WATCHDOG_SECONDS
-                        )));
-                    }
-                    _ => {
-                        self.status = Some(StatusMessage::error(t("mode_switched_but_the_previous_mode_is_unavailable_auto_rollback_is_disabled")));
-                    }
-                }
-                self.worker.send(WorkerRequest::ScanOutputs);
-            }
-            Err(err) => {
-                self.status = Some(StatusMessage::error(crate::trf!(
-                    "failed_to_switch_mode",
-                    err
-                )));
-                self.worker.send(WorkerRequest::ScanOutputs);
-            }
-        }
-    }
-
-    fn adopt_baseline(&mut self, baseline: Baseline, reset: bool) {
-        if reset || self.baseline.is_none() {
-            self.keybind_edits.clear();
-            self.keybind_deletions.clear();
-            self.keybind_form = KeybindForm::default();
-            self.failures.clear();
-        }
-        self.baseline = Some(baseline);
-        self.sync_selected_mode();
-    }
-
-    fn update_watchdog(&mut self, ctx: &egui::Context) {
-        let deadline = match &self.watchdog {
-            Some(watchdog) => watchdog.deadline,
-            None => return,
-        };
-        let now = Instant::now();
-        if now >= deadline {
-            self.revert_mode();
-        } else {
-            ctx.request_repaint_after((deadline - now).min(Duration::from_millis(200)));
-        }
-    }
-
-    pub fn build_tasks(&self) -> Vec<Task> {
-        let mut tasks = self.env.pending();
-        let Some(baseline) = &self.baseline else {
-            return tasks;
-        };
-
-        for deletion in &self.keybind_deletions {
-            let normalized = keybinds::normalize_key(deletion);
-            let Some(entry) = baseline
-                .keybinds
-                .iter()
-                .find(|entry| keybinds::normalize_key(&entry.key) == normalized)
-            else {
-                continue;
-            };
-            tasks.push(Task {
-                id: keybind_remove_id(&entry.key),
-                module: ModuleKind::Keybind,
-                title: crate::trf!("delete_shortcut", entry.key),
-                detail: entry.summary(),
-                change_count: 1,
-                action: TaskAction::KeybindRemove {
-                    key: entry.key.clone(),
-                },
-            });
-        }
-
-        for edit in &self.keybind_edits {
-            let target = keybinds::normalize_key(&edit.key);
-            let target_entry = baseline
-                .keybinds
-                .iter()
-                .find(|entry| keybinds::normalize_key(&entry.key) == target);
-
-            if let Some(original) = &edit.original_key {
-                let original_norm = keybinds::normalize_key(original);
-                if let Some(entry) = baseline
-                    .keybinds
-                    .iter()
-                    .find(|entry| keybinds::normalize_key(&entry.key) == original_norm)
-                {
-                    let unchanged = original_norm == target
-                        && entry.actions == edit.actions
-                        && entry.attrs == edit.attrs;
-                    if unchanged {
-                        continue;
-                    }
-                    if original_norm != target {
-                        tasks.push(Task {
-                            id: keybind_remove_id(&entry.key),
-                            module: ModuleKind::Keybind,
-                            title: crate::trf!("delete_shortcut", entry.key),
-                            detail: entry.summary(),
-                            change_count: 1,
-                            action: TaskAction::KeybindRemove {
-                                key: entry.key.clone(),
-                            },
-                        });
-                    }
-                }
-            } else if let Some(entry) = target_entry {
-                if entry.actions == edit.actions && entry.attrs == edit.attrs {
-                    continue;
-                }
-            }
-
-            let replace = target_entry.is_some();
-            tasks.push(Task {
-                id: keybind_add_id(edit),
-                module: ModuleKind::Keybind,
-                title: crate::trf!("shortcut", edit.key, edit.summary()),
-                detail: if replace {
-                    t("overwrite_the_existing_binding_for_this_key_in_rc_xml").to_string()
-                } else {
-                    t("write_a_new_key_binding").to_string()
-                },
-                change_count: 1,
-                action: TaskAction::KeybindAdd {
-                    key: edit.key.clone(),
-                    attrs: edit.attrs.clone(),
-                    actions: edit.actions.clone(),
-                    replace,
-                },
-            });
-        }
-
-        tasks
     }
 
     pub fn refresh(&mut self) {
@@ -480,28 +97,11 @@ impl App {
             return;
         }
         self.confirm_open = false;
-        self.env.refresh();
-        self.reset_on_baseline = true;
-        self.reset_modes_on_scan = true;
-        self.scanning = true;
-        self.reset_mode_selection();
+        self.failures.clear();
         self.status = Some(StatusMessage::info(t("reloading_configuration")));
-        self.worker.send(WorkerRequest::Refresh);
-        self.worker.send(WorkerRequest::ScanOutputs);
-    }
-
-    pub fn rescan_outputs(&mut self) {
-        self.scanning = true;
-        self.outputs_error = None;
-        self.reset_modes_on_scan = true;
-        self.reset_mode_selection();
-        self.status = Some(StatusMessage::info(t("rescanning")));
-        self.worker.send(WorkerRequest::ScanOutputs);
-    }
-
-    fn reset_mode_selection(&mut self) {
-        self.selected_mode = None;
-        self.sync_selected_mode();
+        for module in &mut self.modules {
+            module.refresh();
+        }
     }
 
     pub fn execute_pending(&mut self) {
@@ -513,366 +113,6 @@ impl App {
         self.status = Some(StatusMessage::info(t("applying_changes")));
         self.worker
             .send(WorkerRequest::ApplyTasks(self.pending.clone()));
-    }
-
-    pub fn reset_keybind_form(&mut self) {
-        self.keybind_form = KeybindForm::default();
-    }
-
-    pub fn load_keybind_for_edit(&mut self, key: &str) {
-        self.keybind_view = KeybindView::Edit;
-        let normalized = keybinds::normalize_key(key);
-
-        let pending_edit = self
-            .keybind_edits
-            .iter()
-            .find(|edit| {
-                edit.original_key
-                    .as_deref()
-                    .map(keybinds::normalize_key)
-                    .as_deref()
-                    == Some(normalized.as_str())
-            })
-            .cloned();
-        if let Some(edit) = pending_edit {
-            self.fill_form_from_edit(&edit);
-            return;
-        }
-
-        let Some(baseline) = &self.baseline else {
-            return;
-        };
-        let Some(entry) = baseline
-            .keybinds
-            .iter()
-            .find(|entry| keybinds::normalize_key(&entry.key) == normalized)
-        else {
-            return;
-        };
-
-        let form = &mut self.keybind_form;
-        form.editing_original = Some(entry.key.clone());
-        form.key = entry.key.clone();
-        form.advanced_xml = keybinds::render_actions(&entry.actions);
-        form.advanced = entry.actions.len() > 1;
-        form.error = None;
-
-        if let Some(action) = entry.actions.first() {
-            form.action = action.name.clone();
-            form.command = action.command.clone();
-            form.attrs = attrs_to_input(&action.attrs);
-        } else {
-            form.action = "Execute".to_string();
-            form.command.clear();
-            form.attrs.clear();
-            form.advanced = true;
-        }
-    }
-
-    fn fill_form_from_edit(&mut self, edit: &KeybindEdit) {
-        let form = &mut self.keybind_form;
-        form.editing_original = edit.original_key.clone();
-        form.key = edit.key.clone();
-        form.advanced_xml = keybinds::render_actions(&edit.actions);
-        form.advanced = edit.actions.len() > 1;
-        form.error = None;
-        if let Some(action) = edit.actions.first() {
-            form.action = action.name.clone();
-            form.command = action.command.clone();
-            form.attrs = attrs_to_input(&action.attrs);
-        } else {
-            form.action = "Execute".to_string();
-            form.command.clear();
-            form.attrs.clear();
-            form.advanced = true;
-        }
-    }
-
-    pub fn submit_keybind(&mut self) {
-        let form = self.keybind_form.clone();
-
-        let key = match keybinds::validate_combo(&form.key) {
-            Ok(key) => key,
-            Err(err) => {
-                self.keybind_form.error = Some(err);
-                return;
-            }
-        };
-
-        let actions = if form.advanced {
-            match keybinds::parse_actions_fragment(&form.advanced_xml) {
-                Ok(actions) => actions,
-                Err(err) => {
-                    self.keybind_form.error = Some(err);
-                    return;
-                }
-            }
-        } else {
-            if let Err(err) = keybinds::validate_action_name(&form.action) {
-                self.keybind_form.error = Some(err);
-                return;
-            }
-            let attrs = match keybinds::parse_attrs(&form.attrs) {
-                Ok(attrs) => attrs,
-                Err(err) => {
-                    self.keybind_form.error = Some(err);
-                    return;
-                }
-            };
-            let command = form.command.trim().to_string();
-            if form.action.trim() == "Execute" && command.is_empty() {
-                self.keybind_form.error =
-                    Some(t("the_execute_action_requires_a_command").to_string());
-                return;
-            }
-            vec![KeybindAction {
-                name: form.action.trim().to_string(),
-                command,
-                attrs,
-            }]
-        };
-
-        let keybind_attrs = form
-            .editing_original
-            .as_ref()
-            .and_then(|original| {
-                let normalized = keybinds::normalize_key(original);
-                self.baseline.as_ref().and_then(|baseline| {
-                    baseline
-                        .keybinds
-                        .iter()
-                        .find(|entry| keybinds::normalize_key(&entry.key) == normalized)
-                        .map(|entry| entry.attrs.clone())
-                })
-            })
-            .unwrap_or_default();
-
-        let edit = KeybindEdit {
-            original_key: form.editing_original.clone(),
-            key: key.clone(),
-            attrs: keybind_attrs,
-            actions,
-        };
-
-        let replace_index = edit.original_key.as_ref().and_then(|original| {
-            self.keybind_edits
-                .iter()
-                .position(|existing| existing.original_key.as_deref() == Some(original.as_str()))
-        });
-
-        let target = keybinds::normalize_key(&edit.key);
-        for (index, other) in self.keybind_edits.iter().enumerate() {
-            if Some(index) == replace_index {
-                continue;
-            }
-            let other_target = keybinds::normalize_key(&other.key);
-            let other_original = other.original_key.as_deref().map(keybinds::normalize_key);
-            if other_target == target || other_original.as_deref() == Some(target.as_str()) {
-                self.keybind_form.error =
-                    Some(t("the_target_key_conflicts_with_another_queued_change").to_string());
-                return;
-            }
-        }
-
-        if let Some(index) = replace_index {
-            self.keybind_edits.remove(index);
-        }
-
-        let original_norm = edit.original_key.as_deref().map(keybinds::normalize_key);
-        self.keybind_deletions.retain(|key| {
-            let normalized = keybinds::normalize_key(key);
-            normalized != target && Some(normalized) != original_norm
-        });
-
-        let status = self.edit_status(&edit);
-        if status == EditStatus::NoChange {
-            self.status = Some(StatusMessage::info(t(
-                "no_change_from_the_current_state_not_queued",
-            )));
-        } else {
-            self.status = Some(StatusMessage::info(crate::trf!(
-                "queued",
-                edit.key,
-                edit.summary()
-            )));
-            self.keybind_edits.push(edit);
-        }
-
-        self.keybind_form.key.clear();
-        self.keybind_form.editing_original = None;
-        self.keybind_form.error = None;
-    }
-
-    pub fn edit_status(&self, edit: &KeybindEdit) -> EditStatus {
-        let Some(baseline) = &self.baseline else {
-            return EditStatus::New;
-        };
-        let target = keybinds::normalize_key(&edit.key);
-        let target_entry = baseline
-            .keybinds
-            .iter()
-            .find(|entry| keybinds::normalize_key(&entry.key) == target);
-
-        if let Some(original) = &edit.original_key {
-            let original_norm = keybinds::normalize_key(original);
-            let original_entry = baseline
-                .keybinds
-                .iter()
-                .find(|entry| keybinds::normalize_key(&entry.key) == original_norm);
-            if original_norm == target {
-                match original_entry {
-                    Some(entry) if entry.actions == edit.actions && entry.attrs == edit.attrs => {
-                        EditStatus::NoChange
-                    }
-                    Some(_) => EditStatus::Update,
-                    None => EditStatus::New,
-                }
-            } else {
-                EditStatus::Rename
-            }
-        } else if let Some(entry) = target_entry {
-            if entry.actions == edit.actions && entry.attrs == edit.attrs {
-                EditStatus::NoChange
-            } else {
-                EditStatus::Overwrite
-            }
-        } else {
-            EditStatus::New
-        }
-    }
-
-    pub fn discard_keybind_edit(&mut self, edit: &KeybindEdit) {
-        self.keybind_edits.retain(|existing| existing != edit);
-        if self.keybind_form.editing_original == edit.original_key {
-            self.keybind_form.editing_original = None;
-        }
-    }
-
-    pub fn delete_keybind(&mut self, key: &str) {
-        let normalized = keybinds::normalize_key(key);
-        self.keybind_edits.retain(|edit| {
-            let target = keybinds::normalize_key(&edit.key);
-            let original = edit.original_key.as_deref().map(keybinds::normalize_key);
-            target != normalized && original.as_deref() != Some(normalized.as_str())
-        });
-        self.keybind_deletions
-            .retain(|item| keybinds::normalize_key(item) != normalized);
-        if self
-            .keybind_form
-            .editing_original
-            .as_deref()
-            .map(keybinds::normalize_key)
-            .as_deref()
-            == Some(normalized.as_str())
-        {
-            self.keybind_form.editing_original = None;
-        }
-        if let Some(baseline) = &self.baseline {
-            if let Some(entry) = baseline
-                .keybinds
-                .iter()
-                .find(|entry| keybinds::normalize_key(&entry.key) == normalized)
-            {
-                self.keybind_deletions.push(entry.key.clone());
-            }
-        }
-        self.status = Some(StatusMessage::info(crate::trf!("queued_for_deletion", key)));
-    }
-
-    pub fn undo_delete_keybind(&mut self, key: &str) {
-        let normalized = keybinds::normalize_key(key);
-        self.keybind_deletions
-            .retain(|item| keybinds::normalize_key(item) != normalized);
-    }
-
-    pub fn is_pending_deletion(&self, key: &str) -> bool {
-        let normalized = keybinds::normalize_key(key);
-        self.keybind_deletions
-            .iter()
-            .any(|item| keybinds::normalize_key(item) == normalized)
-    }
-
-    pub fn keybind_edit_failure(&self, edit: &KeybindEdit) -> Option<String> {
-        if let Some(original) = &edit.original_key {
-            if let Some(err) = self.failures.get(&keybind_remove_id(original)) {
-                return Some(err.clone());
-            }
-        }
-        self.failures.get(&keybind_add_id(edit)).cloned()
-    }
-
-    pub fn selected_output_info(&self) -> Option<OutputInfo> {
-        let name = self.selected_output.as_ref()?;
-        self.outputs.iter().find(|item| &item.name == name).cloned()
-    }
-
-    pub fn sync_selected_mode(&mut self) {
-        let Some(output) = self.selected_output_info() else {
-            self.selected_mode = None;
-            return;
-        };
-        let valid = self
-            .selected_mode
-            .as_ref()
-            .map(|mode| output.modes.iter().any(|item| item.same_mode(mode)))
-            .unwrap_or(false);
-        if !valid {
-            self.selected_mode = output
-                .current
-                .clone()
-                .or_else(|| output.modes.first().cloned());
-        }
-    }
-
-    pub fn request_mode_apply(&mut self) {
-        if self.watchdog.is_some() || self.mode_inflight.is_some() {
-            return;
-        }
-        let Some(output) = self.selected_output_info() else {
-            return;
-        };
-        let Some(mode) = self.selected_mode.clone() else {
-            return;
-        };
-        if !output.enabled || output.current.is_none() {
-            self.status = Some(StatusMessage::error(t(
-                "the_output_is_disabled_refusing_to_switch",
-            )));
-            return;
-        }
-        if output
-            .current
-            .as_ref()
-            .map(|current| current.same_mode(&mode))
-            .unwrap_or(false)
-        {
-            return;
-        }
-        self.mode_inflight = Some(PendingModeChange {
-            mode: mode.clone(),
-            previous: output.current.clone(),
-        });
-        self.status = Some(StatusMessage::info(crate::trf!(
-            "switching_to",
-            mode.label()
-        )));
-        self.worker.send(WorkerRequest::ApplyMode {
-            output: output.name,
-            spec: mode.spec(),
-        });
-    }
-
-    pub fn revert_mode(&mut self) {
-        if let Some(watchdog) = self.watchdog.take() {
-            self.worker.send(WorkerRequest::RevertMode {
-                output: watchdog.output.clone(),
-                spec: watchdog.previous.spec(),
-            });
-            self.status = Some(StatusMessage::info(crate::trf!(
-                "restoring",
-                watchdog.output
-            )));
-        }
     }
 
     fn confirm_dialog(&mut self, ctx: &egui::Context) {
@@ -904,7 +144,9 @@ impl App {
                 });
                 ui.separator();
                 ui.label(
-                    egui::RichText::new(t("files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry"))
+                    egui::RichText::new(t(
+                        "files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry",
+                    ))
                     .small()
                     .weak(),
                 );
@@ -926,63 +168,6 @@ impl App {
         }
     }
 
-    fn watchdog_overlay(&mut self, ctx: &egui::Context) {
-        let Some(watchdog) = self.watchdog.clone() else {
-            return;
-        };
-        let mut keep = false;
-        let mut revert = false;
-
-        egui::Window::new(t("confirm_display_mode"))
-            .anchor(egui::Align2::CENTER_TOP, [0.0, 24.0])
-            .collapsible(false)
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.set_min_width(380.0);
-                ui.label(crate::trf!(
-                    "switched_to",
-                    watchdog.output,
-                    watchdog.mode.label()
-                ));
-                ui.add(
-                    egui::ProgressBar::new(watchdog.fraction())
-                        .text(crate::trf!("s", watchdog.remaining_secs()))
-                        .animate(false),
-                );
-                ui.label(crate::trf!(
-                    "seconds_until_auto_revert_to",
-                    watchdog.remaining_secs(),
-                    watchdog.previous.label()
-                ));
-                ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    if ui.button(t("roll_back_now")).clicked() {
-                        revert = true;
-                    }
-                    if ui
-                        .add(
-                            egui::Button::new(
-                                egui::RichText::new(t("keep_this_mode"))
-                                    .strong()
-                                    .color(egui::Color32::WHITE),
-                            )
-                            .fill(theme::ACCENT),
-                        )
-                        .clicked()
-                    {
-                        keep = true;
-                    }
-                });
-            });
-
-        if revert {
-            self.revert_mode();
-        } else if keep {
-            self.watchdog = None;
-            self.status = Some(StatusMessage::info(t("new_display_mode_kept")));
-        }
-    }
-
     fn report_dialog(&mut self, ctx: &egui::Context) {
         if !self.report_open {
             return;
@@ -998,12 +183,6 @@ impl App {
             .resizable(true)
             .default_width(560.0)
             .show(ctx, |ui| {
-                for file in &report.files {
-                    ui.label(crate::trf!("written", file));
-                }
-                if !report.files.is_empty() {
-                    ui.separator();
-                }
                 for result in &report.results {
                     ui.horizontal_wrapped(|ui| {
                         if result.ok {
@@ -1017,11 +196,15 @@ impl App {
                         ui.label(egui::RichText::new(err).small().color(theme::DANGER));
                     }
                 }
-                if let Some(err) = &report.reconfigure_error {
+
+                if !report.warnings.is_empty() {
                     ui.separator();
-                    ui.colored_label(theme::DANGER, t("labwc_reload_failed"));
-                    ui.label(egui::RichText::new(err).small());
+                    ui.colored_label(theme::WARN, t("warnings"));
+                    for warning in &report.warnings {
+                        ui.label(egui::RichText::new(warning).small());
+                    }
                 }
+
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label(
@@ -1043,35 +226,58 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         i18n::set_current(self.lang);
         self.poll_events();
-        self.update_watchdog(ctx);
-        self.pending = self.build_tasks();
+
+        {
+            let modules = &mut self.modules;
+            let failures = &self.failures;
+            let status = &mut self.status;
+            let mut module_ctx = ModuleCtx { failures, status };
+            for module in modules {
+                module.update(ctx, &mut module_ctx);
+            }
+        }
+
+        {
+            let mut tasks = Vec::new();
+            for module in &mut self.modules {
+                tasks.extend(module.pending());
+            }
+            self.pending = tasks;
+        }
 
         sidebar::show(self, ctx);
         status_bar::show(self, ctx);
 
+        let current = self.current;
         egui::CentralPanel::default().show(ctx, |ui| {
-            let module = self.current;
-            ui.add_space(6.0);
-            ui.heading(module.title());
-            ui.label(egui::RichText::new(module.subtitle()).weak());
-            ui.add_space(10.0);
-            match module {
-                ModuleKind::Display => {
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| modules::display::show(self, ui));
-                }
-                ModuleKind::Keybind => modules::keybind::show(self, ui),
-                ModuleKind::Environment => {
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false, false])
-                        .show(ui, |ui| self.env.ui(ui, &self.failures));
-                }
+            let meta = self.modules.get(current).map(|module| module.meta());
+            if let Some(meta) = meta {
+                ui.add_space(6.0);
+                ui.heading(t(meta.title_key));
+                ui.label(egui::RichText::new(t(meta.subtitle_key)).weak());
+                ui.add_space(10.0);
+            }
+
+            let modules = &mut self.modules;
+            let failures = &self.failures;
+            let status = &mut self.status;
+            let mut module_ctx = ModuleCtx { failures, status };
+            if let Some(module) = modules.get_mut(current) {
+                module.ui(ui, &mut module_ctx);
             }
         });
 
+        {
+            let modules = &mut self.modules;
+            let failures = &self.failures;
+            let status = &mut self.status;
+            let mut module_ctx = ModuleCtx { failures, status };
+            for module in modules {
+                module.overlay(ctx, &mut module_ctx);
+            }
+        }
+
         self.confirm_dialog(ctx);
-        self.watchdog_overlay(ctx);
         self.report_dialog(ctx);
     }
 }

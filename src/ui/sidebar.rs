@@ -1,8 +1,8 @@
 use eframe::egui::{self, RichText};
 
 use crate::app::App;
-use crate::core::model::{Category, ModuleKind};
 use crate::i18n::{self, t, Lang};
+use crate::modules::Category;
 
 pub fn show(app: &mut App, ctx: &egui::Context) {
     egui::SidePanel::left("sidebar")
@@ -38,22 +38,24 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             for category in Category::ALL {
                 ui.add_space(8.0);
                 ui.label(RichText::new(category.label()).small().weak());
-                for module in ModuleKind::ALL
-                    .into_iter()
-                    .filter(|module| module.category() == category)
-                {
+                for (index, module) in app.modules.iter().enumerate() {
+                    let meta = module.meta();
+                    if meta.category != category {
+                        continue;
+                    }
                     let count: usize = app
                         .pending
                         .iter()
-                        .filter(|task| task.module == module)
+                        .filter(|task| task.module_id == meta.id)
                         .map(|task| task.change_count)
                         .sum();
+                    let title = t(meta.title_key);
                     let text = if count > 0 {
-                        format!("{}   ({})", module.title(), count)
+                        format!("{title}   ({count})")
                     } else {
-                        module.title().to_string()
+                        title.to_string()
                     };
-                    let selected = app.current == module;
+                    let selected = app.current == index;
                     if ui
                         .add_sized(
                             [ui.available_width(), 32.0],
@@ -61,7 +63,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         )
                         .clicked()
                     {
-                        app.current = module;
+                        app.current = index;
                     }
                 }
             }

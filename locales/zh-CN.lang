@@ -38,6 +38,7 @@ clear_form	清空表单
 click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym	点击修饰键和主键即可组合；上方输入框仍可手输任意 keysym。
 close	关闭
 command	命令
+command_failed	命令失败 {}：{}
 common	常用
 common_actions	常用动作…
 configuration_reloaded	配置已重新载入
@@ -87,6 +88,7 @@ failed_to_read	读取 {} 失败：{}
 failed_to_read_configuration	读取配置失败：{}
 failed_to_reload_configuration	；重读配置失败：{}
 failed_to_replace	替换 {} 失败：{}
+failed_to_run_command	无法执行命令 {}：{}
 failed_to_run_wlr_randr	无法执行 wlr-randr：{}
 failed_to_switch_mode	切换失败：{}
 failed_to_write_temporary_file	写入临时文件 {} 失败：{}
@@ -101,6 +103,7 @@ key	主键
 key_2	按键
 key_bindings	快捷键绑定
 key_combination	按键组合
+keybind_changes	快捷键（{} 项变更）
 labwc_lxqt_control_center	Labwc × LXQt 控制中心
 labwc_reload_failed	labwc 重载失败
 labwc_reload_failed_2	；labwc 重载失败：{}
@@ -212,6 +215,8 @@ use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_retu
 vol	音量+
 vol_2	音量-
 waiting_for_confirmation	等待确认中…
+warnings	警告
+warnings_suffix	，警告 {} 条
 was_not_found_key_bindings_cannot_be_written	未找到 {}，快捷键无法写入。
 wifi	无线
 wlr_module	WLR 模块

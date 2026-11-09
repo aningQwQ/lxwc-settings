@@ -38,6 +38,7 @@ clear_form	Clear form
 click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym	Click modifiers and a key to build the combination; the field above still accepts any keysym.
 close	Close
 command	Command
+command_failed	Command failed {}: {}
 common	Common
 common_actions	Common actions…
 configuration_reloaded	Configuration reloaded
@@ -87,6 +88,7 @@ failed_to_read	Failed to read {}: {}
 failed_to_read_configuration	Failed to read configuration: {}
 failed_to_reload_configuration	; failed to reload configuration: {}
 failed_to_replace	Failed to replace {}: {}
+failed_to_run_command	Failed to run command {}: {}
 failed_to_run_wlr_randr	Failed to run wlr-randr: {}
 failed_to_switch_mode	Failed to switch mode: {}
 failed_to_write_temporary_file	Failed to write temporary file {}: {}
@@ -101,6 +103,7 @@ key	Key
 key_2	Key
 key_bindings	Key Bindings
 key_combination	Key combination
+keybind_changes	Key bindings ({} changes)
 labwc_lxqt_control_center	Labwc × LXQt Control Center
 labwc_reload_failed	labwc reload failed
 labwc_reload_failed_2	; labwc reload failed: {}
@@ -212,6 +215,8 @@ use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_retu
 vol	Vol+
 vol_2	Vol-
 waiting_for_confirmation	Waiting for confirmation…
+warnings	Warnings
+warnings_suffix	, {} warning(s)
 was_not_found_key_bindings_cannot_be_written	{} was not found; key bindings cannot be written.
 wifi	WiFi
 wlr_module	WLR Module

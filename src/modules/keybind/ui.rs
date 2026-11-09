@@ -1,54 +1,52 @@
 use eframe::egui::{self, RichText};
 
-use crate::app::{attrs_to_input, keybind_remove_id, App, KeyPickTab, KeybindForm, KeybindView};
-use crate::core::keybinds;
-use crate::core::model::{EditStatus, KeybindAction, KeybindEntry, ACTION_SUGGESTIONS};
+use super::file;
+use super::types::*;
+use super::KeybindModule;
 use crate::i18n::t;
+use crate::modules::ModuleCtx;
 use crate::ui::theme;
 
-pub fn show(app: &mut App, ui: &mut egui::Ui) {
-    let count = app
-        .baseline
-        .as_ref()
-        .map(|baseline| baseline.keybinds.len())
-        .unwrap_or(0);
+pub(super) fn show(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
+    let count = module.baseline.len();
 
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut app.keybind_view, KeybindView::Edit, t("edit_add"));
+        ui.selectable_value(&mut module.view, KeybindView::Edit, t("edit_add"));
         ui.selectable_value(
-            &mut app.keybind_view,
+            &mut module.view,
             KeybindView::Existing,
             crate::trf!("existing_shortcuts", count),
         );
     });
     ui.separator();
 
-    match app.keybind_view {
+    match module.view {
         KeybindView::Edit => {
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
-                .show(ui, |ui| edit_view(app, ui));
+                .show(ui, |ui| edit_view(module, ui, ctx));
         }
-        KeybindView::Existing => existing_view(app, ui),
+        KeybindView::Existing => existing_view(module, ui, ctx),
     }
 }
 
-fn edit_view(app: &mut App, ui: &mut egui::Ui) {
+fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
     ui.label(
         RichText::new(t("type_a_labwc_keysym_combination_and_action_or_load_one_from_the_existing_shortcuts_tab"))
         .small()
         .weak(),
     );
-    if let Some(baseline) = &app.baseline {
-        if !baseline.rc_exists {
-            ui.colored_label(
-                theme::DANGER,
-                crate::trf!(
-                    "was_not_found_key_bindings_cannot_be_written",
-                    baseline.rc_path.display()
-                ),
-            );
-        }
+    if !module.exists {
+        ui.colored_label(
+            theme::DANGER,
+            crate::trf!(
+                "was_not_found_key_bindings_cannot_be_written",
+                module.path.display()
+            ),
+        );
+    }
+    if let Some(err) = &module.error {
+        ui.colored_label(theme::DANGER, RichText::new(err).small());
     }
 
     ui.add_space(8.0);
@@ -56,7 +54,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(t("key_combination"));
             ui.add(
-                egui::TextEdit::singleline(&mut app.keybind_form.key)
+                egui::TextEdit::singleline(&mut module.form.key)
                     .hint_text(t("e_g_w_c_s_t_w_return_print_xf86audiomute"))
                     .desired_width(320.0)
                     .font(egui::TextStyle::Monospace),
@@ -69,53 +67,53 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
         );
 
         ui.add_space(8.0);
-        soft_keyboard(app, ui);
+        soft_keyboard(module, ui);
         ui.add_space(6.0);
-        let mut advanced = app.keybind_form.advanced;
+        let mut advanced = module.form.advanced;
         ui.horizontal(|ui| {
             ui.label(t("action_mode"));
             ui.selectable_value(&mut advanced, false, t("common"));
             ui.selectable_value(&mut advanced, true, t("advanced_xml"));
         });
-        if advanced != app.keybind_form.advanced {
-            app.keybind_form.advanced = advanced;
-            if advanced && app.keybind_form.advanced_xml.trim().is_empty() {
-                if let Ok(actions) = build_common_actions(&app.keybind_form) {
-                    app.keybind_form.advanced_xml = keybinds::render_actions(&actions);
+        if advanced != module.form.advanced {
+            module.form.advanced = advanced;
+            if advanced && module.form.advanced_xml.trim().is_empty() {
+                if let Ok(actions) = build_common_actions(&module.form) {
+                    module.form.advanced_xml = file::render_actions(&actions);
                 }
             }
         }
 
-        if app.keybind_form.advanced {
+        if module.form.advanced {
             ui.label(t("action_xml_multiple_actions_allowed"));
             ui.add(
-                egui::TextEdit::multiline(&mut app.keybind_form.advanced_xml)
+                egui::TextEdit::multiline(&mut module.form.advanced_xml)
                     .code_editor()
                     .desired_rows(4)
                     .desired_width(f32::INFINITY),
             );
             if ui.button(t("regenerate_from_common_fields")).clicked() {
-                match build_common_actions(&app.keybind_form) {
+                match build_common_actions(&module.form) {
                     Ok(actions) => {
-                        app.keybind_form.advanced_xml = keybinds::render_actions(&actions)
+                        module.form.advanced_xml = file::render_actions(&actions)
                     }
-                    Err(err) => app.keybind_form.error = Some(err),
+                    Err(err) => module.form.error = Some(err),
                 }
             }
         } else {
             ui.horizontal(|ui| {
                 ui.label(t("action_name"));
                 ui.add(
-                    egui::TextEdit::singleline(&mut app.keybind_form.action)
+                    egui::TextEdit::singleline(&mut module.form.action)
                         .desired_width(180.0),
                 );
                 egui::ComboBox::from_id_source("action-suggest")
                     .selected_text(t("common_actions"))
                     .show_ui(ui, |ui| {
                         for name in ACTION_SUGGESTIONS {
-                            let selected = app.keybind_form.action == *name;
+                            let selected = module.form.action == *name;
                             if ui.selectable_label(selected, *name).clicked() {
-                                app.keybind_form.action = (*name).to_string();
+                                module.form.action = (*name).to_string();
                             }
                         }
                     });
@@ -123,7 +121,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 ui.label(t("command"));
                 ui.add(
-                    egui::TextEdit::singleline(&mut app.keybind_form.command)
+                    egui::TextEdit::singleline(&mut module.form.command)
                         .hint_text(t("required_for_execute_e_g_lxqt_qdbus_run_qterminal"))
                         .desired_width(440.0),
                 );
@@ -131,13 +129,13 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             ui.horizontal(|ui| {
                 ui.label(t("extra_attributes"));
                 ui.add(
-                    egui::TextEdit::singleline(&mut app.keybind_form.attrs)
+                    egui::TextEdit::singleline(&mut module.form.attrs)
                         .hint_text(t("e_g_direction_left_combine_yes"))
                         .desired_width(440.0),
                 );
             });
-            if app.keybind_form.editing_original.is_some()
-                && app.keybind_form.advanced_xml.matches("<action").count() > 1
+            if module.form.editing_original.is_some()
+                && module.form.advanced_xml.matches("<action").count() > 1
             {
                 ui.label(
                     RichText::new(t("note_this_binding_contains_multiple_actions_submitting_in_common_mode_keeps_only_the_first_one_use_advanced_xml_instead"))
@@ -147,17 +145,17 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             }
         }
 
-        if let Ok(preview) = preview_for_form(&app.keybind_form) {
+        if let Ok(preview) = preview_for_form(&module.form) {
             egui::CollapsingHeader::new(t("xml_preview")).show(ui, |ui| {
                 ui.label(RichText::new(preview).monospace().small());
             });
         }
 
-        if let Some(err) = &app.keybind_form.error {
+        if let Some(err) = &module.form.error {
             ui.colored_label(theme::DANGER, RichText::new(err).small());
         }
 
-        if let Some(original) = &app.keybind_form.editing_original {
+        if let Some(original) = &module.form.editing_original {
             ui.label(
                 RichText::new(crate::trf!("editing_other_keybind_attributes_are_preserved", original))
                     .small()
@@ -167,7 +165,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
 
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            let submit_label = if app.keybind_form.editing_original.is_some() {
+            let submit_label = if module.form.editing_original.is_some() {
                 t("add_update_queue")
             } else {
                 t("add_to_queue")
@@ -183,39 +181,39 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
                 )
                 .clicked()
             {
-                app.submit_keybind();
+                match module.submit() {
+                    Ok(message) => ctx.info(message),
+                    Err(err) => module.form.error = Some(err),
+                }
             }
             if ui.button(t("clear_form")).clicked() {
-                app.reset_keybind_form();
+                module.reset_form();
             }
-            if app.keybind_form.editing_original.is_some() && ui.button(t("cancel_editing")).clicked() {
-                app.reset_keybind_form();
+            if module.form.editing_original.is_some() && ui.button(t("cancel_editing")).clicked() {
+                module.reset_form();
             }
         });
     });
 
     ui.add_space(14.0);
     ui.label(RichText::new(t("pending_shortcuts")).strong());
-    if app.keybind_edits.is_empty() && app.keybind_deletions.is_empty() {
+    if module.edits.is_empty() && module.deletions.is_empty() {
         ui.label(
             RichText::new(t("the_queue_is_empty_fill_in_a_key_combination_and_action_or_edit_delete_from_the_existing_shortcuts_tab"))
             .small()
             .weak(),
         );
     } else {
-        let edits = app.keybind_edits.clone();
-        let deletions = app.keybind_deletions.clone();
-        let mut discard: Option<crate::core::model::KeybindEdit> = None;
+        let edits = module.edits.clone();
+        let deletions = module.deletions.clone();
+        let mut discard: Option<KeybindEdit> = None;
 
         for edit in &edits {
-            let status = app.edit_status(edit);
-            let failure = app.keybind_edit_failure(edit);
+            let status = module.edit_status(edit);
             let renamed = edit
                 .original_key
                 .as_ref()
-                .map(|original| {
-                    keybinds::normalize_key(original) != keybinds::normalize_key(&edit.key)
-                })
+                .map(|original| file::normalize_key(original) != file::normalize_key(&edit.key))
                 .unwrap_or(false);
 
             ui.horizontal(|ui| {
@@ -237,22 +235,18 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
                     discard = Some(edit.clone());
                 }
             });
-            if let Some(err) = failure {
-                ui.label(
-                    RichText::new(crate::trf!("failed_3", err))
-                        .small()
-                        .color(theme::DANGER),
-                );
-            }
         }
 
         if let Some(edit) = discard {
-            app.discard_keybind_edit(&edit);
+            module.discard_edit(&edit);
+        }
+
+        if let Some(err) = ctx.failures.get("keybind") {
+            ui.colored_label(theme::DANGER, RichText::new(err).small());
         }
 
         let mut undo: Option<String> = None;
         for key in &deletions {
-            let failure = app.failures.get(&keybind_remove_id(key)).cloned();
             ui.horizontal(|ui| {
                 ui.monospace(key);
                 ui.colored_label(theme::DANGER, t("pending_delete"));
@@ -260,38 +254,27 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
                     undo = Some(key.clone());
                 }
             });
-            if let Some(err) = failure {
-                ui.label(
-                    RichText::new(crate::trf!("failed_3", err))
-                        .small()
-                        .color(theme::DANGER),
-                );
-            }
         }
         if let Some(key) = undo {
-            app.undo_delete_keybind(&key);
+            module.undo_delete(&key);
         }
     }
 }
 
-fn existing_view(app: &mut App, ui: &mut egui::Ui) {
+fn existing_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
     ui.horizontal(|ui| {
         ui.add(
-            egui::TextEdit::singleline(&mut app.keybind_filter)
+            egui::TextEdit::singleline(&mut module.filter)
                 .hint_text(t("search_key_action_command"))
                 .desired_width(320.0),
         );
-        if !app.keybind_filter.is_empty() && ui.button(t("clear")).clicked() {
-            app.keybind_filter.clear();
+        if !module.filter.is_empty() && ui.button(t("clear")).clicked() {
+            module.filter.clear();
         }
     });
 
-    let filter = app.keybind_filter.trim().to_lowercase();
-    let binds = app
-        .baseline
-        .as_ref()
-        .map(|baseline| baseline.keybinds.clone())
-        .unwrap_or_default();
+    let filter = module.filter.trim().to_lowercase();
+    let binds = module.baseline.clone();
     let filtered: Vec<&KeybindEntry> = binds
         .iter()
         .filter(|entry| {
@@ -391,13 +374,13 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
                 });
 
                 row.col(|ui| {
-                    let pending_delete = app.is_pending_deletion(&entry.key);
-                    let pending_edit = app.keybind_edits.iter().any(|edit| {
+                    let pending_delete = module.is_pending_deletion(&entry.key);
+                    let pending_edit = module.edits.iter().any(|edit| {
                         edit.original_key
                             .as_deref()
-                            .map(keybinds::normalize_key)
+                            .map(file::normalize_key)
                             .as_deref()
-                            == Some(keybinds::normalize_key(&entry.key).as_str())
+                            == Some(file::normalize_key(&entry.key).as_str())
                     });
                     if pending_delete {
                         ui.colored_label(theme::DANGER, t("pending_delete"));
@@ -407,7 +390,7 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
                 });
 
                 row.col(|ui| {
-                    if app.is_pending_deletion(&entry.key) {
+                    if module.is_pending_deletion(&entry.key) {
                         if ui.small_button(t("undo_delete")).clicked() {
                             pending_action = Some((BindAction::UndoDelete, entry.key.clone()));
                         }
@@ -425,9 +408,12 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
 
     if let Some((action, key)) = pending_action {
         match action {
-            BindAction::Edit => app.load_keybind_for_edit(&key),
-            BindAction::Delete => app.delete_keybind(&key),
-            BindAction::UndoDelete => app.undo_delete_keybind(&key),
+            BindAction::Edit => module.load_for_edit(&key),
+            BindAction::Delete => {
+                let message = module.delete(&key);
+                ctx.info(message);
+            }
+            BindAction::UndoDelete => module.undo_delete(&key),
         }
     }
 }
@@ -448,8 +434,8 @@ fn status_color(status: EditStatus) -> egui::Color32 {
 }
 
 fn build_common_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String> {
-    keybinds::validate_action_name(&form.action)?;
-    let attrs = keybinds::parse_attrs(&form.attrs)?;
+    file::validate_action_name(&form.action)?;
+    let attrs = file::parse_attrs(&form.attrs)?;
     let command = form.command.trim().to_string();
     if form.action.trim() == "Execute" && command.is_empty() {
         return Err(t("the_execute_action_requires_a_command").to_string());
@@ -463,16 +449,16 @@ fn build_common_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String
 
 fn form_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String> {
     if form.advanced {
-        keybinds::parse_actions_fragment(&form.advanced_xml)
+        file::parse_actions_fragment(&form.advanced_xml)
     } else {
         build_common_actions(form)
     }
 }
 
 fn preview_for_form(form: &KeybindForm) -> Result<String, String> {
-    let key = keybinds::validate_combo(&form.key)?;
+    let key = file::validate_combo(&form.key)?;
     let actions = form_actions(form)?;
-    Ok(keybinds::render_keybind_preview(&key, &[], &actions))
+    Ok(file::render_keybind_preview(&key, &[], &actions))
 }
 
 #[derive(Clone, Copy, Default)]
@@ -542,8 +528,8 @@ fn set_base_key(input: &str, base: &str) -> String {
     compose_combo(parts, Some(base))
 }
 
-fn soft_keyboard(app: &mut App, ui: &mut egui::Ui) {
-    let mut key_value = app.keybind_form.key.clone();
+fn soft_keyboard(module: &mut KeybindModule, ui: &mut egui::Ui) {
+    let mut key_value = module.form.key.clone();
     let mut changed = false;
     let (mods, _) = parse_parts(&key_value);
 
@@ -571,19 +557,19 @@ fn soft_keyboard(app: &mut App, ui: &mut egui::Ui) {
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
         ui.label(t("key"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Letters, t("letters"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Digits, t("digits"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Function, t("f_keys"));
+        ui.selectable_value(&mut module.pick_tab, KeyPickTab::Letters, t("letters"));
+        ui.selectable_value(&mut module.pick_tab, KeyPickTab::Digits, t("digits"));
+        ui.selectable_value(&mut module.pick_tab, KeyPickTab::Function, t("f_keys"));
         ui.selectable_value(
-            &mut app.keybind_pick_tab,
+            &mut module.pick_tab,
             KeyPickTab::Navigation,
             t("navigation"),
         );
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Symbols, t("symbols"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Media, t("media"));
+        ui.selectable_value(&mut module.pick_tab, KeyPickTab::Symbols, t("symbols"));
+        ui.selectable_value(&mut module.pick_tab, KeyPickTab::Media, t("media"));
     });
 
-    let keys = pick_keys(app.keybind_pick_tab);
+    let keys = pick_keys(module.pick_tab);
     ui.horizontal_wrapped(|ui| {
         for (label, value) in keys {
             let selected = base.as_deref() == Some(value);
@@ -595,7 +581,7 @@ fn soft_keyboard(app: &mut App, ui: &mut egui::Ui) {
     });
 
     if changed {
-        app.keybind_form.key = key_value;
+        module.form.key = key_value;
     }
 
     ui.label(

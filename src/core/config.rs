@@ -1,8 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use super::keybinds;
-use super::model::Baseline;
-
 pub fn config_dir() -> PathBuf {
     std::env::var_os("LXWC_CONFIG_DIR")
         .map(PathBuf::from)
@@ -11,29 +8,12 @@ pub fn config_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(".config/labwc"))
 }
 
-pub fn rc_path() -> PathBuf {
-    std::env::var_os("LXWC_RC_XML")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| config_dir().join("rc.xml"))
-}
-
 pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok((text, true)),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok((String::new(), false)),
         Err(err) => Err(crate::trf!("failed_to_read", path.display(), err)),
     }
-}
-
-pub fn load_baseline() -> Result<Baseline, String> {
-    let rc_path = rc_path();
-    let (rc_raw, rc_exists) = read_optional(&rc_path)?;
-    let keybinds = keybinds::parse(&rc_raw)?;
-    Ok(Baseline {
-        rc_path,
-        rc_exists,
-        keybinds,
-    })
 }
 
 pub fn write_file_if_unchanged(

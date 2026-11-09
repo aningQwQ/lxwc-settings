@@ -2,7 +2,7 @@ use quick_xml::escape::unescape;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
 
-use super::model::{KeybindAction, KeybindEntry};
+use super::types::{KeybindAction, KeybindEntry};
 
 #[derive(Clone, Debug)]
 pub struct Addition {

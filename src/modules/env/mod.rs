@@ -1,14 +1,14 @@
 mod file;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 
 use crate::core::config;
-use crate::core::model::{ApplyReport, ModuleKind, Task, TaskAction};
+use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
-use crate::modules::SettingsModule;
+use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
 use crate::ui::theme;
 
 const ENV_TASK_ID: &str = "env";
@@ -119,11 +119,11 @@ impl EnvModule {
 
         Some(Task {
             id: ENV_TASK_ID.to_string(),
-            module: ModuleKind::Environment,
+            module_id: "env",
             title: crate::trf!("environment_changes", changes.len()),
             detail: changes.join(", "),
             change_count: changes.len(),
-            action: TaskAction::WriteFile {
+            effects: vec![Effect::WriteFile {
                 path: self.path.clone(),
                 contents: file::patch(&self.raw, &sets, &unsets),
                 expected: if self.exists {
@@ -131,17 +131,26 @@ impl EnvModule {
                 } else {
                     None
                 },
-            },
+            }],
         })
     }
 }
 
 impl SettingsModule for EnvModule {
+    fn meta(&self) -> ModuleMeta {
+        ModuleMeta {
+            id: "env",
+            title_key: "environment_tweaks",
+            subtitle_key: "edit_labwc_environment_for_streaming_and_compatibility_switches",
+            category: Category::Environment,
+        }
+    }
+
     fn refresh(&mut self) {
         self.reload(true);
     }
 
-    fn pending(&self) -> Vec<Task> {
+    fn pending(&mut self) -> Vec<Task> {
         self.pending_task().into_iter().collect()
     }
 
@@ -149,7 +158,7 @@ impl SettingsModule for EnvModule {
         self.reload(false);
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui, failures: &HashMap<String, String>) {
+    fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
         ui.label(t(
             "these_switches_are_written_to_config_labwc_environment_and_only_take_effect_the_next_time_the_labwc_session_starts",
         ));
@@ -168,7 +177,7 @@ impl SettingsModule for EnvModule {
         }
 
         if self.pending_task().is_some() {
-            if let Some(err) = failures.get(ENV_TASK_ID) {
+            if let Some(err) = ctx.failures.get(ENV_TASK_ID) {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }
         }
@@ -264,7 +273,7 @@ mod tests {
         assert_eq!(tasks.len(), 1);
         assert_eq!(tasks[0].change_count, 2);
 
-        let TaskAction::WriteFile { path, contents, .. } = &tasks[0].action else {
+        let Effect::WriteFile { path, contents, .. } = &tasks[0].effects[0] else {
             panic!("expected file write");
         };
         assert!(contents.contains("WLR_DRM_NO_MODIFIERS=1"));
