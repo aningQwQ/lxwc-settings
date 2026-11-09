@@ -1,7 +1,6 @@
 mod app;
 mod core;
 mod i18n;
-mod kanshi;
 mod labwc;
 mod modules;
 mod plugins;

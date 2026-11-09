@@ -101,7 +101,6 @@ display_output	Display & Output
 display_scan_failed	Display scan failed: {}
 does_not_exist_and_will_be_created_when_applying	{} does not exist and will be created when applying.
 done_succeeded	Done: {} succeeded
-dynamic_persist	Dynamic multi-output (kanshi)
 e_g_direction_left_combine_yes	e.g. direction="left" combine="yes"
 e_g_w_c_s_t_w_return_print_xf86audiomute	e.g. W-C-S-t, W-Return, Print, XF86AudioMute
 edit	Edit
@@ -420,15 +419,7 @@ fix_invalid_input_before_applying	Fix invalid input before applying.
 points	Points
 select_custom_profile_to_edit_curves	Select the Custom acceleration profile to edit curves.
 step	Step
-persist_dynamic_display	Persist dynamic display profile
-dynamic_persist_help	Writes a multi-output profile to the kanshi config. Kanshi must be running in the session.
-kanshi_path	kanshi config: {}
-kanshi_profile_preview	kanshi profile preview
 output_and_mode	Output and mode
-reload_and_rescan	Reload files and rescan
-current_written	Current configuration files
-current_autostart	autostart contents
-current_kanshi	kanshi contents
 will_write	Will write
 will_update	Applying will update the current configuration.
 up_to_date	The current configuration matches the selection.
@@ -436,4 +427,4 @@ clear_persisted_display	Clear current configuration
 clear_persisted_display_help	Remove the managed display block.
 will_clear_persisted_display	Applying will clear the managed display configuration.
 do_not_persist	Do not persist a display
-not_persisting_help	No autostart or kanshi display block will be written.
+not_persisting_help	No autostart display block will be written.

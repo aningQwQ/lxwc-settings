@@ -101,7 +101,6 @@ display_output	显示与输出
 display_scan_failed	扫描显示器失败：{}
 does_not_exist_and_will_be_created_when_applying	{} 不存在，应用时会自动创建。
 done_succeeded	执行完成：成功 {} 项
-dynamic_persist	动态多屏（kanshi）
 e_g_direction_left_combine_yes	例如 direction="left" combine="yes"
 e_g_w_c_s_t_w_return_print_xf86audiomute	例如 W-C-S-t、W-Return、Print、XF86AudioMute
 edit	编辑
@@ -420,15 +419,7 @@ fix_invalid_input_before_applying	请先修正无效输入再应用。
 points	采样点
 select_custom_profile_to_edit_curves	选择 Custom 加速配置后可编辑曲线。
 step	步进
-persist_dynamic_display	固化动态多屏配置
-dynamic_persist_help	将多屏规则写入 kanshi 配置；会话中需要运行 kanshi。
-kanshi_path	kanshi 配置：{}
-kanshi_profile_preview	kanshi 配置预览
 output_and_mode	输出与模式
-reload_and_rescan	刷新文件并重扫
-current_written	当前配置文件
-current_autostart	autostart 内容
-current_kanshi	kanshi 内容
 will_write	将写入
 will_update	应用后将更新当前配置。
 up_to_date	当前配置与选择一致。
@@ -436,4 +427,4 @@ clear_persisted_display	清除当前配置
 clear_persisted_display_help	移除由程序管理的显示配置块。
 will_clear_persisted_display	应用后将清除由程序管理的显示配置。
 do_not_persist	不设置默认显示
-not_persisting_help	不会写入 autostart 或 kanshi 显示配置。
+not_persisting_help	不会写入 autostart 显示配置。

@@ -7,7 +7,6 @@ No outstanding core tasks.
 - Appearance, window behaviour, mouse/touchpad, keyboard, and touchscreen settings.
 - Custom pointer acceleration curves.
 - `layout(variant)` XKB merge with `XKB_DEFAULT_VARIANT` cleared.
-- Dynamic multi-output persistence through the kanshi config.
 - Cross-module rc.xml/environment aggregation into one atomic write per file.
 - Single comment block when appending multiple environment variables.
 - Custom ComboBox values remain visible when outside the preset list.

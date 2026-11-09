@@ -20,7 +20,7 @@ files. Changes are validated, backed up, and written atomically.
 
 - **Default display configuration**  
   Persist the selected output and mode as a `wlr-randr` command in Labwc's
-  `autostart`, or write a multi-output profile to the kanshi config.
+  `autostart`.
 
 - **Appearance**  
   Window theme, icon theme, corner radius, drop shadows, decoration mode, and
@@ -62,7 +62,6 @@ files. Changes are validated, backed up, and written atomically.
 - A recent stable Rust toolchain (edition 2021)
 - `wlr-randr` for display scanning and mode switching
 - `labwc` in `PATH` for reloading configuration
-- `kanshi` for dynamic multi-output profiles (optional)
 - Optional: `fc-match`/fontconfig for automatic CJK font loading
 
 ## Build and run
@@ -100,14 +99,12 @@ The following environment variables override the defaults:
 | `LXWC_RC_XML` | Path to `rc.xml` |
 | `LXWC_ENVIRONMENT` | Path to `environment` |
 | `LXWC_AUTOSTART` | Path to `autostart` |
-| `LXWC_KANSHI_CONFIG` | Path to the kanshi config |
 | `LXWC_LANG` | Force `zh` or `en` |
 | `LXWC_LOCALE_DIR` | Additional locale directory |
 | `LXWC_XKB_RULES` | Alternative `evdev.lst` path |
 
 Changes to `rc.xml` trigger Labwc reconfiguration. Environment changes take
-effect after a new session. Dynamic display profiles are written to the kanshi
-config and require kanshi to be running in the session.
+effect after a new session.
 
 Before replacing a file, the current contents are copied to a `.lxwc.bak` file.
 Temporary files use the `.lxwc.tmp` suffix.
@@ -121,7 +118,6 @@ src/
   services/       Generic file transactions and the background worker
   wlr/            WLR adapter: wlr-randr scanning, parsing, mode commands
   labwc/          Labwc adapter: rc.xml, environment, autostart, paths, reconfigure
-  kanshi/         Kanshi adapter: config path, profiles, managed blocks
   plugins/        UI-free presets such as LXQt commands
   modules/        UI and business state for each settings page
   ui/             Sidebar, status bar, and theme

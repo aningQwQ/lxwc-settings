@@ -6,7 +6,6 @@ use eframe::egui::{self, RichText};
 
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
-use crate::kanshi;
 use crate::labwc::{autostart, paths};
 use crate::modules::{Category, ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
 use crate::ui::theme;
@@ -14,12 +13,11 @@ use crate::wlr::{self, Mode, OutputInfo};
 
 pub const MODULE_ID: &str = crate::modules::DEFAULT_DISPLAY_MODULE_ID;
 const TASK_ID: &str = "display-default";
-const DYNAMIC_TASK_ID: &str = "display-dynamic";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DisplayPersist {
     None,
     Static,
-    Dynamic,
 }
 
 pub struct LabwcDisplayModule {
@@ -27,10 +25,6 @@ pub struct LabwcDisplayModule {
     autostart_raw: String,
     autostart_exists: bool,
     autostart_error: Option<String>,
-    kanshi_path: PathBuf,
-    kanshi_raw: String,
-    kanshi_exists: bool,
-    kanshi_error: Option<String>,
     outputs: Vec<OutputInfo>,
     scan_error: Option<String>,
     scan_rx: Option<Receiver<Result<Vec<OutputInfo>, String>>>,
@@ -41,19 +35,15 @@ pub struct LabwcDisplayModule {
 
 impl LabwcDisplayModule {
     pub fn new() -> Self {
-        Self::with_paths(paths::autostart(), kanshi::config_path())
+        Self::with_path(paths::autostart())
     }
 
-    fn with_paths(autostart_path: PathBuf, kanshi_path: PathBuf) -> Self {
+    fn with_path(autostart_path: PathBuf) -> Self {
         let mut module = Self {
             autostart_path,
             autostart_raw: String::new(),
             autostart_exists: false,
             autostart_error: None,
-            kanshi_path,
-            kanshi_raw: String::new(),
-            kanshi_exists: false,
-            kanshi_error: None,
             outputs: Vec::new(),
             scan_error: None,
             scan_rx: None,
@@ -62,7 +52,6 @@ impl LabwcDisplayModule {
             display_persist: DisplayPersist::None,
         };
         module.reload_autostart();
-        module.reload_kanshi();
         module.display_persist = module.detect_persist();
         module.selection_from_config();
         module
@@ -81,36 +70,23 @@ impl LabwcDisplayModule {
         }
     }
 
-    fn reload_kanshi(&mut self) {
-        match kanshi::load(&self.kanshi_path) {
-            Ok(file) => {
-                self.kanshi_raw = file.raw;
-                self.kanshi_exists = file.exists;
-                self.kanshi_error = None;
-            }
-            Err(err) => {
-                self.kanshi_error = Some(err);
-            }
-        }
-    }
-
     fn detect_persist(&self) -> DisplayPersist {
         if autostart::managed_block(&self.autostart_raw).is_some() {
             DisplayPersist::Static
-        } else if kanshi::managed_block(&self.kanshi_raw).is_some() {
-            DisplayPersist::Dynamic
         } else {
             DisplayPersist::None
         }
     }
 
+    fn restore_from_config(&mut self) {
+        self.reload_autostart();
+        self.display_persist = self.detect_persist();
+        self.selection_from_config();
+    }
+
     fn selection_from_config(&mut self) {
         let parsed = autostart::managed_block(&self.autostart_raw)
-            .and_then(|block| autostart::parse_command(&block))
-            .or_else(|| {
-                kanshi::managed_block(&self.kanshi_raw)
-                    .and_then(|block| kanshi::parse_profile(&block))
-            });
+            .and_then(|block| autostart::parse_command(&block));
         if let Some((output, spec)) = parsed {
             self.selected_output = Some(output);
             self.selected_mode = wlr::parse_spec(&spec);
@@ -180,7 +156,10 @@ impl LabwcDisplayModule {
                 output.modes.push(mode);
             }
         } else {
-            self.selected_mode = output.modes.first().cloned();
+            self.selected_mode = output
+                .current
+                .clone()
+                .or_else(|| output.modes.first().cloned());
         }
     }
 
@@ -194,12 +173,8 @@ impl LabwcDisplayModule {
 
     fn pending_tasks(&self) -> Vec<Task> {
         match self.display_persist {
-            DisplayPersist::None => [self.clear_static_task(), self.clear_dynamic_task()]
-                .into_iter()
-                .flatten()
-                .collect(),
+            DisplayPersist::None => self.clear_task().into_iter().collect(),
             DisplayPersist::Static => self.static_task().into_iter().collect(),
-            DisplayPersist::Dynamic => self.dynamic_task().into_iter().collect(),
         }
     }
 
@@ -234,7 +209,7 @@ impl LabwcDisplayModule {
         })
     }
 
-    fn clear_static_task(&self) -> Option<Task> {
+    fn clear_task(&self) -> Option<Task> {
         if self.autostart_error.is_some() || autostart::managed_block(&self.autostart_raw).is_none()
         {
             return None;
@@ -254,57 +229,6 @@ impl LabwcDisplayModule {
             }],
         })
     }
-
-    fn clear_dynamic_task(&self) -> Option<Task> {
-        if self.kanshi_error.is_some() || kanshi::managed_block(&self.kanshi_raw).is_none() {
-            return None;
-        }
-        let contents = kanshi::remove_block(&self.kanshi_raw);
-        Some(Task {
-            id: DYNAMIC_TASK_ID.to_string(),
-            module_id: MODULE_ID,
-            title: t("clear_persisted_display").to_string(),
-            detail: t("clear_persisted_display_help").to_string(),
-            change_count: 1,
-            attribution: vec![(MODULE_ID, 1)],
-            effects: vec![Effect::WriteFile {
-                path: self.kanshi_path.clone(),
-                contents,
-                expected: Some(self.kanshi_raw.clone()),
-            }],
-        })
-    }
-
-    fn dynamic_task(&self) -> Option<Task> {
-        if self.kanshi_error.is_some() {
-            return None;
-        }
-        let output_name = self.selected_output.as_ref()?;
-        let mode = self.selected_mode.as_ref()?;
-        let profile = kanshi::profile(&self.outputs, output_name, mode)?;
-        let contents = kanshi::contents(&self.kanshi_raw, &profile);
-        if contents == self.kanshi_raw {
-            return None;
-        }
-
-        Some(Task {
-            id: DYNAMIC_TASK_ID.to_string(),
-            module_id: MODULE_ID,
-            title: t("persist_dynamic_display").to_string(),
-            detail: format!("{} {} — kanshi", output_name, mode.label()),
-            change_count: 1,
-            attribution: vec![(MODULE_ID, 1)],
-            effects: vec![Effect::WriteFile {
-                path: self.kanshi_path.clone(),
-                contents,
-                expected: if self.kanshi_exists {
-                    Some(self.kanshi_raw.clone())
-                } else {
-                    None
-                },
-            }],
-        })
-    }
 }
 
 impl SettingsModule for LabwcDisplayModule {
@@ -318,8 +242,7 @@ impl SettingsModule for LabwcDisplayModule {
     }
 
     fn refresh(&mut self) {
-        self.reload_autostart();
-        self.reload_kanshi();
+        self.restore_from_config();
         self.scan_outputs();
     }
 
@@ -337,11 +260,6 @@ impl SettingsModule for LabwcDisplayModule {
     fn on_applied(&mut self, report: &ApplyReport) {
         if report.task_succeeded(MODULE_ID, TASK_ID) || report.task_failed(MODULE_ID, TASK_ID) {
             self.reload_autostart();
-        }
-        if report.task_succeeded(MODULE_ID, DYNAMIC_TASK_ID)
-            || report.task_failed(MODULE_ID, DYNAMIC_TASK_ID)
-        {
-            self.reload_kanshi();
         }
     }
 
@@ -367,21 +285,14 @@ impl SettingsModule for LabwcDisplayModule {
         ui.scope(|ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(t("output_and_mode")).strong());
-                if ui.button(t("reload_and_rescan")).clicked() {
-                    ctx.info(t("rescanning"));
-                    self.reload_autostart();
-                    self.reload_kanshi();
-                    self.display_persist = self.detect_persist();
-                    self.selection_from_config();
-                    self.scan_outputs();
+                if self.scan_rx.is_some() {
+                    ui.label(RichText::new(t("scanning")).small().weak());
                 }
             });
 
-            if self.scan_rx.is_some() {
-                ui.label(RichText::new(t("scanning")).small().weak());
-            } else if let Some(err) = &self.scan_error {
+            if let Some(err) = &self.scan_error {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
-            } else if self.outputs.is_empty() {
+            } else if self.scan_rx.is_none() && self.outputs.is_empty() {
                 ui.label(RichText::new(t("no_outputs_detected")).weak());
             }
 
@@ -422,6 +333,7 @@ impl SettingsModule for LabwcDisplayModule {
 
                 if let Some(output) = self.selected_output_info() {
                     let modes = output.modes.clone();
+                    let current_mode = output.current.clone();
                     let selected_mode = self.selected_mode.clone();
                     let mode_combo_text = selected_mode
                         .as_ref()
@@ -436,11 +348,19 @@ impl SettingsModule for LabwcDisplayModule {
                             .selected_text(mode_combo_text)
                             .show_ui(ui, |ui| {
                                 for mode in &modes {
+                                    let mut label = mode.label();
+                                    if current_mode
+                                        .as_ref()
+                                        .map(|current| current.same_mode(mode))
+                                        .unwrap_or(false)
+                                    {
+                                        label.push_str(t("current"));
+                                    }
                                     let selected = selected_mode
                                         .as_ref()
                                         .map(|current| current.same_mode(mode))
                                         .unwrap_or(false);
-                                    if ui.selectable_label(selected, mode.label()).clicked() {
+                                    if ui.selectable_label(selected, label).clicked() {
                                         new_mode = Some(mode.clone());
                                     }
                                 }
@@ -454,21 +374,6 @@ impl SettingsModule for LabwcDisplayModule {
             }
 
             let static_block = autostart::managed_block(&self.autostart_raw);
-            let dynamic_block = kanshi::managed_block(&self.kanshi_raw);
-
-            section(ui, "current_written");
-            block_view(ui, "current_autostart", static_block.as_deref());
-            ui.label(
-                RichText::new(crate::trf!("autostart_path", self.autostart_path.display()))
-                    .small()
-                    .weak(),
-            );
-            block_view(ui, "current_kanshi", dynamic_block.as_deref());
-            ui.label(
-                RichText::new(crate::trf!("kanshi_path", self.kanshi_path.display()))
-                    .small()
-                    .weak(),
-            );
 
             section(ui, "persistence_options");
             ui.radio_value(
@@ -481,14 +386,8 @@ impl SettingsModule for LabwcDisplayModule {
                 DisplayPersist::Static,
                 t("static_persist"),
             );
-            ui.radio_value(
-                &mut self.display_persist,
-                DisplayPersist::Dynamic,
-                t("dynamic_persist"),
-            );
 
-            let any_block = static_block.is_some() || dynamic_block.is_some();
-            if any_block && self.display_persist != DisplayPersist::None {
+            if static_block.is_some() && self.display_persist != DisplayPersist::None {
                 if ui.button(t("clear_persisted_display")).clicked() {
                     self.display_persist = DisplayPersist::None;
                 }
@@ -497,7 +396,7 @@ impl SettingsModule for LabwcDisplayModule {
             let selection = self.selected_output.clone().zip(self.selected_mode.clone());
             match self.display_persist {
                 DisplayPersist::None => {
-                    if any_block {
+                    if static_block.is_some() {
                         ui.colored_label(
                             theme::WARN,
                             RichText::new(t("will_clear_persisted_display")).small(),
@@ -506,46 +405,18 @@ impl SettingsModule for LabwcDisplayModule {
                         ui.label(RichText::new(t("not_persisting_help")).small().weak());
                     }
                 }
-                DisplayPersist::Static | DisplayPersist::Dynamic => {
+                DisplayPersist::Static => {
                     if let Some((output_name, mode)) = &selection {
                         ui.label(crate::trf!("will_persist", output_name, mode.label()));
-                        if self.display_persist == DisplayPersist::Dynamic {
-                            ui.label(RichText::new(t("dynamic_persist_help")).small().weak());
-                        }
-
                         ui.label(RichText::new(t("will_write")).small().strong());
-                        match self.display_persist {
-                            DisplayPersist::Static => {
-                                let command = wlr::set_mode_command(output_name, &mode.spec());
-                                ui.label(
-                                    RichText::new(crate::trf!("autostart_command", command))
-                                        .monospace()
-                                        .small(),
-                                );
-                            }
-                            DisplayPersist::Dynamic => {
-                                if let Some(profile) =
-                                    kanshi::profile(&self.outputs, output_name, mode)
-                                {
-                                    ui.label(
-                                        RichText::new(t("kanshi_profile_preview")).small().strong(),
-                                    );
-                                    ui.label(RichText::new(profile).monospace().small());
-                                } else {
-                                    ui.label(
-                                        RichText::new(t("no_outputs_detected")).small().weak(),
-                                    );
-                                }
-                            }
-                            DisplayPersist::None => {}
-                        }
+                        let command = wlr::set_mode_command(output_name, &mode.spec());
+                        ui.label(
+                            RichText::new(crate::trf!("autostart_command", command))
+                                .monospace()
+                                .small(),
+                        );
 
-                        let file_error = match self.display_persist {
-                            DisplayPersist::Static => self.autostart_error.is_some(),
-                            DisplayPersist::Dynamic => self.kanshi_error.is_some(),
-                            DisplayPersist::None => false,
-                        };
-                        if !file_error {
+                        if self.autostart_error.is_none() {
                             if self.pending_tasks().is_empty() {
                                 ui.colored_label(theme::OK, RichText::new(t("up_to_date")).small());
                             } else {
@@ -561,16 +432,16 @@ impl SettingsModule for LabwcDisplayModule {
                 }
             }
 
+            ui.label(
+                RichText::new(crate::trf!("autostart_path", self.autostart_path.display()))
+                    .small()
+                    .weak(),
+            );
+
             if let Some(err) = &self.autostart_error {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }
-            if let Some(err) = &self.kanshi_error {
-                ui.colored_label(theme::DANGER, RichText::new(err).small());
-            }
             if let Some(err) = ctx.failures.get(TASK_ID) {
-                ui.colored_label(theme::DANGER, RichText::new(err).small());
-            }
-            if let Some(err) = ctx.failures.get(DYNAMIC_TASK_ID) {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }
         });
@@ -583,40 +454,29 @@ fn section(ui: &mut egui::Ui, title: &'static str) {
     ui.label(RichText::new(t(title)).strong());
 }
 
-fn block_view(ui: &mut egui::Ui, title: &'static str, block: Option<&str>) {
-    ui.label(RichText::new(t(title)).small().strong());
-    match block {
-        Some(block) => {
-            ui.label(RichText::new(block).monospace().small());
-        }
-        None => {
-            ui.label(RichText::new(t("not_set")).small().weak());
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::core::model::TaskResult;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn temp_paths() -> (PathBuf, PathBuf, PathBuf) {
+    fn temp_paths() -> (PathBuf, PathBuf) {
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         let dir = std::env::temp_dir().join(format!("lxwc-labwc-display-test-{unique}"));
         std::fs::create_dir_all(&dir).unwrap();
-        (dir.clone(), dir.join("autostart"), dir.join("kanshi"))
+        let autostart = dir.join("autostart");
+        (dir, autostart)
     }
 
-    fn report_id(id: &str, ok: bool) -> ApplyReport {
+    fn report(ok: bool) -> ApplyReport {
         ApplyReport {
             results: vec![TaskResult {
-                id: id.to_string(),
+                id: TASK_ID.to_string(),
                 module_id: MODULE_ID,
-                title: id.to_string(),
+                title: TASK_ID.to_string(),
                 change_count: 1,
                 ok,
                 error: if ok {
@@ -630,23 +490,20 @@ mod tests {
         }
     }
 
-    fn report(ok: bool) -> ApplyReport {
-        report_id(TASK_ID, ok)
-    }
-
     #[test]
-    fn detects_existing_persist_mode() {
-        let (dir, autostart_path, kanshi_path) = temp_paths();
-        let mut module =
-            LabwcDisplayModule::with_paths(autostart_path.clone(), kanshi_path.clone());
-        assert_eq!(module.display_persist, DisplayPersist::None);
-
+    fn restore_resets_unsaved_selection_to_saved_default() {
+        let (dir, autostart_path) = temp_paths();
         std::fs::write(
             &autostart_path,
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        module = LabwcDisplayModule::with_paths(autostart_path, kanshi_path);
+        let mut module = LabwcDisplayModule::with_path(autostart_path);
+        module.display_persist = DisplayPersist::None;
+        module.selected_output = Some("B".to_string());
+        module.selected_mode = wlr::parse_spec("2x2@50.000000Hz");
+
+        module.restore_from_config();
         assert_eq!(module.display_persist, DisplayPersist::Static);
         assert_eq!(module.selected_output.as_deref(), Some("A"));
         assert_eq!(
@@ -658,22 +515,22 @@ mod tests {
     }
 
     #[test]
-    fn reads_selection_from_kanshi_profile() {
-        let (dir, autostart_path, kanshi_path) = temp_paths();
+    fn detects_existing_persist_mode() {
+        let (dir, autostart_path) = temp_paths();
+        let mut module = LabwcDisplayModule::with_path(autostart_path.clone());
+        assert_eq!(module.display_persist, DisplayPersist::None);
+
         std::fs::write(
-            &kanshi_path,
-            kanshi::contents(
-                "",
-                "profile {\n    output \"HDMI-A-1\" mode 1920x1080@60.000000Hz position 0,0\n}",
-            ),
+            &autostart_path,
+            autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let module = LabwcDisplayModule::with_paths(autostart_path, kanshi_path);
-        assert_eq!(module.display_persist, DisplayPersist::Dynamic);
-        assert_eq!(module.selected_output.as_deref(), Some("HDMI-A-1"));
+        module = LabwcDisplayModule::with_path(autostart_path);
+        assert_eq!(module.display_persist, DisplayPersist::Static);
+        assert_eq!(module.selected_output.as_deref(), Some("A"));
         assert_eq!(
             module.selected_mode.as_ref().map(|mode| mode.spec()),
-            Some("1920x1080@60.000000Hz".to_string())
+            Some("1x1@60.000000Hz".to_string())
         );
 
         std::fs::remove_dir_all(dir).ok();
@@ -681,8 +538,8 @@ mod tests {
 
     #[test]
     fn display_default_writes_autostart() {
-        let (dir, autostart, kanshi) = temp_paths();
-        let mut module = LabwcDisplayModule::with_paths(autostart, kanshi);
+        let (dir, autostart) = temp_paths();
+        let mut module = LabwcDisplayModule::with_path(autostart);
         module.selected_output = Some("HDMI-A-1".to_string());
         module.selected_mode = Some(wlr::parse_spec("1920x1080@60.000000Hz").unwrap());
         module.display_persist = DisplayPersist::Static;
@@ -708,83 +565,15 @@ mod tests {
         std::fs::remove_dir_all(dir).ok();
     }
 
-    fn output(name: &str, mode: Mode, position: (i32, i32)) -> OutputInfo {
-        OutputInfo {
-            name: name.to_string(),
-            description: String::new(),
-            enabled: true,
-            current: Some(mode.clone()),
-            modes: vec![mode],
-            position: Some(position),
-            scale: Some(1.0),
-        }
-    }
-
-    #[test]
-    fn dynamic_display_writes_kanshi_profile() {
-        let (dir, autostart, kanshi_path) = temp_paths();
-        let mut module = LabwcDisplayModule::with_paths(autostart, kanshi_path.clone());
-        module.outputs = vec![
-            output(
-                "eDP-1",
-                Mode {
-                    width: 1920,
-                    height: 1080,
-                    refresh: 60.0,
-                },
-                (0, 0),
-            ),
-            output(
-                "HDMI-A-1",
-                Mode {
-                    width: 2560,
-                    height: 1440,
-                    refresh: 60.0,
-                },
-                (1920, 0),
-            ),
-        ];
-        module.selected_output = Some("HDMI-A-1".to_string());
-        module.selected_mode = Some(Mode {
-            width: 1920,
-            height: 1080,
-            refresh: 60.0,
-        });
-        module.display_persist = DisplayPersist::Dynamic;
-
-        let tasks = module.pending();
-        assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].id, DYNAMIC_TASK_ID);
-        let Effect::WriteFile {
-            path,
-            contents,
-            expected,
-        } = &tasks[0].effects[0]
-        else {
-            panic!("expected kanshi write");
-        };
-        assert_eq!(path, &kanshi_path);
-        assert!(expected.is_none());
-        assert!(contents.contains("profile {"));
-        assert!(contents.contains("output \"eDP-1\" mode 1920x1080@60.000000Hz position 0,0"));
-        assert!(contents.contains("output \"HDMI-A-1\" mode 1920x1080@60.000000Hz position 1920,0"));
-
-        std::fs::write(&kanshi_path, contents).unwrap();
-        module.on_applied(&report_id(DYNAMIC_TASK_ID, true));
-        assert!(module.pending().is_empty());
-
-        std::fs::remove_dir_all(dir).ok();
-    }
-
     #[test]
     fn clear_removes_managed_block() {
-        let (dir, autostart_path, kanshi_path) = temp_paths();
+        let (dir, autostart_path) = temp_paths();
         std::fs::write(
             &autostart_path,
             autostart::contents("foo\n", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let mut module = LabwcDisplayModule::with_paths(autostart_path.clone(), kanshi_path);
+        let mut module = LabwcDisplayModule::with_path(autostart_path.clone());
         module.display_persist = DisplayPersist::None;
 
         let tasks = module.pending();
@@ -804,8 +593,8 @@ mod tests {
 
     #[test]
     fn handoff_prefills_selection() {
-        let (dir, autostart, kanshi) = temp_paths();
-        let mut module = LabwcDisplayModule::with_paths(autostart, kanshi);
+        let (dir, autostart) = temp_paths();
+        let mut module = LabwcDisplayModule::with_path(autostart);
         module.on_message(&ModulePayload::DisplayDefault {
             output: "HDMI-A-1".to_string(),
             spec: "1920x1080@60.000000Hz".to_string(),

@@ -18,8 +18,7 @@
   属性以及高级 XML 片段。
 
 - **默认显示配置**  
-  将选定的输出和模式作为 `wlr-randr` 命令写入 Labwc 的 `autostart`，或将多屏规则
-  写入 kanshi 配置。
+  将选定的输出和模式作为 `wlr-randr` 命令写入 Labwc 的 `autostart`。
 
 - **外观**  
   窗口主题、图标主题、圆角、阴影、装饰模式、最大化装饰。
@@ -57,7 +56,6 @@
 - 较新的稳定 Rust 工具链（edition 2021）
 - `wlr-randr`：扫描输出和切换模式
 - `labwc`：重新加载配置
-- `kanshi`：动态多屏配置（可选）
 - 可选：`fc-match`/fontconfig，用于自动加载中文字体
 
 ## 构建与运行
@@ -95,13 +93,11 @@ cargo install --path .
 | `LXWC_RC_XML` | `rc.xml` 路径 |
 | `LXWC_ENVIRONMENT` | `environment` 路径 |
 | `LXWC_AUTOSTART` | `autostart` 路径 |
-| `LXWC_KANSHI_CONFIG` | kanshi 配置路径 |
 | `LXWC_LANG` | 强制使用 `zh` 或 `en` |
 | `LXWC_LOCALE_DIR` | 额外翻译目录 |
 | `LXWC_XKB_RULES` | 替代的 `evdev.lst` 路径 |
 
 修改 `rc.xml` 后会触发 Labwc 重新加载配置。环境变量修改需要新会话生效。
-动态显示规则写入 kanshi 配置，需要会话中运行 kanshi。
 
 写入前会将原文件复制为 `.lxwc.bak`，临时文件使用 `.lxwc.tmp` 后缀。
 
@@ -114,7 +110,6 @@ src/
   services/       通用文件事务和后台 worker
   wlr/            WLR 适配器：wlr-randr 扫描、解析、模式命令
   labwc/          Labwc 适配器：rc.xml、environment、autostart、路径、重载
-  kanshi/         kanshi 适配器：配置路径、profile、托管标记块
   plugins/        无 UI 的预设，例如 LXQt 命令
   modules/        各设置页面的 UI 与业务状态
   ui/             侧边栏、状态栏和主题
