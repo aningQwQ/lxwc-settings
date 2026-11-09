@@ -437,26 +437,30 @@ impl eframe::App for App {
 
         let current = self.current;
         egui::CentralPanel::default().show(ctx, |ui| {
-            let meta = self.modules.get(current).map(|module| module.meta());
-            if let Some(meta) = meta {
-                ui.add_space(6.0);
-                ui.heading(t(meta.title_key));
-                ui.label(egui::RichText::new(t(meta.subtitle_key)).weak());
-                ui.add_space(10.0);
-            }
+            egui::ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    let meta = self.modules.get(current).map(|module| module.meta());
+                    if let Some(meta) = meta {
+                        ui.add_space(6.0);
+                        ui.heading(t(meta.title_key));
+                        ui.label(egui::RichText::new(t(meta.subtitle_key)).weak());
+                        ui.add_space(10.0);
+                    }
 
-            let modules = &mut self.modules;
-            let failures = &self.failures;
-            let status = &mut self.status;
-            let requests = &mut requests;
-            let mut module_ctx = ModuleCtx {
-                failures,
-                status,
-                requests,
-            };
-            if let Some(module) = modules.get_mut(current) {
-                module.ui(ui, &mut module_ctx);
-            }
+                    let modules = &mut self.modules;
+                    let failures = &self.failures;
+                    let status = &mut self.status;
+                    let requests = &mut requests;
+                    let mut module_ctx = ModuleCtx {
+                        failures,
+                        status,
+                        requests,
+                    };
+                    if let Some(module) = modules.get_mut(current) {
+                        module.ui(ui, &mut module_ctx);
+                    }
+                });
         });
 
         {
