@@ -9,7 +9,6 @@ use crate::labwc::{environment, paths};
 use crate::modules::{
     Category, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, ENVIRONMENT_TASK_ID,
 };
-use crate::services::fs;
 use crate::ui::theme;
 
 struct ManagedEnv {
@@ -57,10 +56,10 @@ impl EnvModule {
     }
 
     fn reload(&mut self, reset_desired: bool) {
-        match fs::read_optional(&self.path) {
-            Ok((raw, exists)) => {
-                self.raw = raw;
-                self.exists = exists;
+        match environment::load(&self.path) {
+            Ok(file) => {
+                self.raw = file.raw;
+                self.exists = file.exists;
                 self.baseline = environment::parse_active(&self.raw);
                 if reset_desired || self.desired.is_empty() {
                     self.desired.clear();

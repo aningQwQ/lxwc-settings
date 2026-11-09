@@ -2,7 +2,7 @@ use eframe::egui::{self, RichText};
 
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::labwc::layouts::{self, Layout};
+use crate::labwc::layouts::{self, Layout, LayoutEntry};
 use crate::modules::scalar::{EnvState, ScalarState, Spec};
 use crate::modules::{
     Category, ConfigEdit, ModuleCtx, ModuleMeta, SettingsModule, ENVIRONMENT_TASK_ID,
@@ -44,12 +44,6 @@ const OPTION_PRESETS: [(&str, &str); 9] = [
     ("grp:ctrl_alt_toggle", "ctrl_alt"),
 ];
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct LayoutEntry {
-    code: String,
-    variant: String,
-}
-
 pub struct KeyboardModule {
     rc: ScalarState,
     env: EnvState,
@@ -80,14 +74,16 @@ impl KeyboardModule {
     fn load_fields(&mut self) {
         let layout = self.env.get("XKB_DEFAULT_LAYOUT").unwrap_or_default();
         let variant = self.env.get("XKB_DEFAULT_VARIANT").unwrap_or_default();
-        self.layouts = parse_layouts(&layout, &variant);
+        self.layouts = layouts::parse_entries(&layout, &variant);
         self.options = self.env.get("XKB_DEFAULT_OPTIONS").unwrap_or_default();
         self.dirty_env = false;
     }
 
     fn sync_env(&mut self) {
-        self.env
-            .set_text("XKB_DEFAULT_LAYOUT", &format_layouts(&self.layouts));
+        self.env.set_text(
+            "XKB_DEFAULT_LAYOUT",
+            &layouts::format_entries(&self.layouts),
+        );
         self.env.set_text("XKB_DEFAULT_VARIANT", "");
         self.env.set_text("XKB_DEFAULT_OPTIONS", &self.options);
     }
@@ -274,55 +270,6 @@ impl SettingsModule for KeyboardModule {
     }
 }
 
-fn parse_layouts(layout: &str, variants: &str) -> Vec<LayoutEntry> {
-    let variants = variants.split(',').map(str::trim).collect::<Vec<_>>();
-    layout
-        .split(',')
-        .map(str::trim)
-        .filter(|item| !item.is_empty())
-        .enumerate()
-        .map(|(index, item)| {
-            if let Some((code, variant)) = parse_layout_item(item) {
-                LayoutEntry {
-                    code: code.to_string(),
-                    variant: variant.to_string(),
-                }
-            } else {
-                LayoutEntry {
-                    code: item.to_string(),
-                    variant: variants
-                        .get(index)
-                        .copied()
-                        .filter(|variant| !variant.is_empty())
-                        .unwrap_or_default()
-                        .to_string(),
-                }
-            }
-        })
-        .collect()
-}
-
-fn parse_layout_item(item: &str) -> Option<(&str, &str)> {
-    let inner = item.strip_suffix(')')?;
-    let (code, variant) = inner.rsplit_once('(')?;
-    Some((code.trim(), variant.trim()))
-}
-
-fn format_layouts(entries: &[LayoutEntry]) -> String {
-    entries
-        .iter()
-        .map(|entry| {
-            let variant = entry.variant.trim();
-            if variant.is_empty() {
-                entry.code.clone()
-            } else {
-                format!("{}({})", entry.code, variant)
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(",")
-}
-
 fn section(ui: &mut egui::Ui, title: &'static str) {
     ui.add_space(8.0);
     ui.separator();
@@ -343,43 +290,4 @@ fn int_slider(
             rc.set_int(path, value);
         }
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn merges_variants_by_index() {
-        let entries = parse_layouts("us,de", "intl,neo");
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].code, "us");
-        assert_eq!(entries[0].variant, "intl");
-        assert_eq!(entries[1].code, "de");
-        assert_eq!(entries[1].variant, "neo");
-    }
-
-    #[test]
-    fn parses_existing_variant_syntax() {
-        let entries = parse_layouts("us(intl),de", "");
-        assert_eq!(entries[0].code, "us");
-        assert_eq!(entries[0].variant, "intl");
-        assert_eq!(entries[1].code, "de");
-        assert!(entries[1].variant.is_empty());
-    }
-
-    #[test]
-    fn formats_layouts_and_omits_empty_variants() {
-        let entries = vec![
-            LayoutEntry {
-                code: "us".to_string(),
-                variant: "intl".to_string(),
-            },
-            LayoutEntry {
-                code: "de".to_string(),
-                variant: String::new(),
-            },
-        ];
-        assert_eq!(format_layouts(&entries), "us(intl),de");
-    }
 }

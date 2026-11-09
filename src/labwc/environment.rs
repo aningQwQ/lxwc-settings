@@ -1,5 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+pub fn load(path: &std::path::Path) -> Result<crate::services::fs::LoadedFile, String> {
+    crate::services::fs::load(path)
+}
+
 pub fn parse_active(raw: &str) -> BTreeMap<String, String> {
     let mut vars = BTreeMap::new();
     for line in raw.lines() {

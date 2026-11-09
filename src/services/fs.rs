@@ -1,5 +1,15 @@
 use std::path::{Path, PathBuf};
 
+pub struct LoadedFile {
+    pub raw: String,
+    pub exists: bool,
+}
+
+pub fn load(path: &Path) -> Result<LoadedFile, String> {
+    let (raw, exists) = read_optional(path)?;
+    Ok(LoadedFile { raw, exists })
+}
+
 pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok((text, true)),

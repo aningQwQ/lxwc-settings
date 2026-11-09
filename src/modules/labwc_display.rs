@@ -1,12 +1,14 @@
 use std::path::PathBuf;
+use std::sync::mpsc::Receiver;
+use std::time::Duration;
 
 use eframe::egui::{self, RichText};
 
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
-use crate::labwc::{autostart, kanshi, paths};
+use crate::kanshi;
+use crate::labwc::{autostart, paths};
 use crate::modules::{Category, ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
-use crate::services::fs;
 use crate::ui::theme;
 use crate::wlr::{self, Mode, OutputInfo};
 
@@ -31,6 +33,7 @@ pub struct LabwcDisplayModule {
     kanshi_error: Option<String>,
     outputs: Vec<OutputInfo>,
     scan_error: Option<String>,
+    scan_rx: Option<Receiver<Result<Vec<OutputInfo>, String>>>,
     selected_output: Option<String>,
     selected_mode: Option<Mode>,
     display_persist: DisplayPersist,
@@ -38,7 +41,7 @@ pub struct LabwcDisplayModule {
 
 impl LabwcDisplayModule {
     pub fn new() -> Self {
-        Self::with_paths(paths::autostart(), paths::kanshi_config())
+        Self::with_paths(paths::autostart(), kanshi::config_path())
     }
 
     fn with_paths(autostart_path: PathBuf, kanshi_path: PathBuf) -> Self {
@@ -53,6 +56,7 @@ impl LabwcDisplayModule {
             kanshi_error: None,
             outputs: Vec::new(),
             scan_error: None,
+            scan_rx: None,
             selected_output: None,
             selected_mode: None,
             display_persist: DisplayPersist::None,
@@ -65,10 +69,10 @@ impl LabwcDisplayModule {
     }
 
     fn reload_autostart(&mut self) {
-        match fs::read_optional(&self.autostart_path) {
-            Ok((raw, exists)) => {
-                self.autostart_raw = raw;
-                self.autostart_exists = exists;
+        match autostart::load(&self.autostart_path) {
+            Ok(file) => {
+                self.autostart_raw = file.raw;
+                self.autostart_exists = file.exists;
                 self.autostart_error = None;
             }
             Err(err) => {
@@ -78,10 +82,10 @@ impl LabwcDisplayModule {
     }
 
     fn reload_kanshi(&mut self) {
-        match fs::read_optional(&self.kanshi_path) {
-            Ok((raw, exists)) => {
-                self.kanshi_raw = raw;
-                self.kanshi_exists = exists;
+        match kanshi::load(&self.kanshi_path) {
+            Ok(file) => {
+                self.kanshi_raw = file.raw;
+                self.kanshi_exists = file.exists;
                 self.kanshi_error = None;
             }
             Err(err) => {
@@ -117,14 +121,32 @@ impl LabwcDisplayModule {
     }
 
     fn scan_outputs(&mut self) {
-        match wlr::scan() {
-            Ok(outputs) => {
-                self.scan_error = None;
+        if self.scan_rx.is_some() {
+            return;
+        }
+        self.scan_error = None;
+        self.scan_rx = Some(wlr::scan_async());
+    }
+
+    fn poll_scan(&mut self) {
+        let Some(rx) = &self.scan_rx else {
+            return;
+        };
+        match rx.try_recv() {
+            Ok(Ok(outputs)) => {
                 self.outputs = outputs;
                 self.sync_selection();
+                self.scan_error = None;
+                self.scan_rx = None;
             }
-            Err(err) => {
+            Ok(Err(err)) => {
                 self.scan_error = Some(err);
+                self.scan_rx = None;
+            }
+            Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                self.scan_error = Some(crate::trf!("scan_failed", "worker stopped"));
+                self.scan_rx = None;
             }
         }
     }
@@ -301,6 +323,13 @@ impl SettingsModule for LabwcDisplayModule {
         self.scan_outputs();
     }
 
+    fn update(&mut self, ui_ctx: &egui::Context, _ctx: &mut ModuleCtx) {
+        if self.scan_rx.is_some() {
+            ui_ctx.request_repaint_after(Duration::from_millis(100));
+        }
+        self.poll_scan();
+    }
+
     fn pending(&mut self) -> Vec<Task> {
         self.pending_tasks()
     }
@@ -348,7 +377,9 @@ impl SettingsModule for LabwcDisplayModule {
                 }
             });
 
-            if let Some(err) = &self.scan_error {
+            if self.scan_rx.is_some() {
+                ui.label(RichText::new(t("scanning")).small().weak());
+            } else if let Some(err) = &self.scan_error {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             } else if self.outputs.is_empty() {
                 ui.label(RichText::new(t("no_outputs_detected")).weak());
@@ -485,11 +516,7 @@ impl SettingsModule for LabwcDisplayModule {
                         ui.label(RichText::new(t("will_write")).small().strong());
                         match self.display_persist {
                             DisplayPersist::Static => {
-                                let command = format!(
-                                    "wlr-randr --output {} --mode {}",
-                                    output_name,
-                                    mode.spec()
-                                );
+                                let command = wlr::set_mode_command(output_name, &mode.spec());
                                 ui.label(
                                     RichText::new(crate::trf!("autostart_command", command))
                                         .monospace()

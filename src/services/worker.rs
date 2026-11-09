@@ -1,10 +1,9 @@
-use std::process::Command as ProcessCommand;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Instant;
 
 use eframe::egui;
 
-use super::fs;
+use super::{fs, process};
 
 use crate::core::model::{ApplyReport, Effect, Task, TaskResult};
 
@@ -115,21 +114,17 @@ fn apply_tasks(tasks: &[Task]) -> ApplyReport {
 }
 
 fn run_command(program: &str, args: &[String]) -> Result<(), String> {
-    let output = ProcessCommand::new(program)
-        .args(args)
-        .output()
+    let output = process::run(program, args)
         .map_err(|err| crate::trf!("failed_to_run_command", program, err))?;
 
-    if output.status.success() {
+    if output.success {
         return Ok(());
     }
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let detail = if stderr.trim().is_empty() {
-        stdout.trim()
+    let detail = if output.stderr.trim().is_empty() {
+        output.stdout.trim()
     } else {
-        stderr.trim()
+        output.stderr.trim()
     };
     Err(crate::trf!("command_failed", program, detail))
 }

@@ -1,6 +1,10 @@
 const AUTOSTART_BEGIN: &str = "# BEGIN lxwc-settings default display";
 const AUTOSTART_END: &str = "# END lxwc-settings default display";
 
+pub fn load(path: &std::path::Path) -> Result<crate::services::fs::LoadedFile, String> {
+    crate::services::fs::load(path)
+}
+
 pub fn managed_block(raw: &str) -> Option<String> {
     let mut block = Vec::new();
     let mut inside = false;

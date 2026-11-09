@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use crate::labwc::{environment, paths, rc_xml};
 use crate::modules::{ConfigEdit, ConfigTarget};
-use crate::services::fs;
 
 #[derive(Clone, Copy)]
 pub struct Spec {
@@ -39,9 +38,9 @@ impl ScalarState {
     }
 
     pub fn reload(&mut self, reset_desired: bool) {
-        match fs::read_optional(&self.path) {
-            Ok((raw, _exists)) => {
-                self.raw = raw;
+        match rc_xml::load(&self.path) {
+            Ok(file) => {
+                self.raw = file.raw;
                 self.baseline.clear();
                 for spec in self.specs {
                     let value = rc_xml::get(&self.raw, spec.path)
@@ -167,9 +166,9 @@ impl EnvState {
     }
 
     pub fn reload(&mut self, reset_desired: bool) {
-        match fs::read_optional(&self.path) {
-            Ok((raw, _exists)) => {
-                let active = environment::parse_active(&raw);
+        match environment::load(&self.path) {
+            Ok(file) => {
+                let active = environment::parse_active(&file.raw);
                 self.baseline.clear();
                 for key in self.keys {
                     self.baseline

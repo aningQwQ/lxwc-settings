@@ -1,6 +1,7 @@
 mod app;
 mod core;
 mod i18n;
+mod kanshi;
 mod labwc;
 mod modules;
 mod plugins;
@@ -8,19 +9,19 @@ mod services;
 mod ui;
 mod wlr;
 
-use std::process::Command as ProcessCommand;
-
 use eframe::egui;
 
 fn load_system_cjk_font() -> Option<Vec<u8>> {
-    let output = ProcessCommand::new("fc-match")
-        .args(["-f", "%{file}", "sans-serif:lang=zh-CN"])
-        .output()
-        .ok()?;
-    if !output.status.success() {
+    let args = vec![
+        "-f".to_string(),
+        "%{file}".to_string(),
+        "sans-serif:lang=zh-CN".to_string(),
+    ];
+    let output = crate::services::process::run("fc-match", &args).ok()?;
+    if !output.success {
         return None;
     }
-    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let path = output.stdout.trim().to_string();
     if path.is_empty() {
         return None;
     }

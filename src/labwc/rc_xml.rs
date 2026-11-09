@@ -5,6 +5,10 @@ use quick_xml::Reader;
 use crate::i18n::t;
 use crate::labwc::actions::known_action_label;
 
+pub fn load(path: &std::path::Path) -> Result<crate::services::fs::LoadedFile, String> {
+    crate::services::fs::load(path)
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeybindAction {
     pub name: String,

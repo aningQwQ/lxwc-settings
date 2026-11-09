@@ -4,6 +4,61 @@ pub struct Layout {
     pub description: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LayoutEntry {
+    pub code: String,
+    pub variant: String,
+}
+
+pub fn parse_entries(layout: &str, variants: &str) -> Vec<LayoutEntry> {
+    let variants = variants.split(',').map(str::trim).collect::<Vec<_>>();
+    layout
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .enumerate()
+        .map(|(index, item)| {
+            if let Some((code, variant)) = parse_entry(item) {
+                LayoutEntry {
+                    code: code.to_string(),
+                    variant: variant.to_string(),
+                }
+            } else {
+                LayoutEntry {
+                    code: item.to_string(),
+                    variant: variants
+                        .get(index)
+                        .copied()
+                        .filter(|variant| !variant.is_empty())
+                        .unwrap_or_default()
+                        .to_string(),
+                }
+            }
+        })
+        .collect()
+}
+
+pub fn format_entries(entries: &[LayoutEntry]) -> String {
+    entries
+        .iter()
+        .map(|entry| {
+            let variant = entry.variant.trim();
+            if variant.is_empty() {
+                entry.code.clone()
+            } else {
+                format!("{}({})", entry.code, variant)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn parse_entry(item: &str) -> Option<(&str, &str)> {
+    let inner = item.strip_suffix(')')?;
+    let (code, variant) = inner.rsplit_once('(')?;
+    Some((code.trim(), variant.trim()))
+}
+
 pub fn layouts() -> Vec<Layout> {
     let path = std::env::var_os("LXWC_XKB_RULES")
         .map(std::path::PathBuf::from)
@@ -93,6 +148,40 @@ mod tests {
         assert_eq!(layouts[0].code, "us");
         assert_eq!(layouts[0].description, "English (US)");
         assert_eq!(layouts[1].code, "gb");
+    }
+
+    #[test]
+    fn merges_variants_by_index() {
+        let entries = parse_entries("us,de", "intl,neo");
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].code, "us");
+        assert_eq!(entries[0].variant, "intl");
+        assert_eq!(entries[1].code, "de");
+        assert_eq!(entries[1].variant, "neo");
+    }
+
+    #[test]
+    fn parses_existing_variant_syntax() {
+        let entries = parse_entries("us(intl),de", "");
+        assert_eq!(entries[0].code, "us");
+        assert_eq!(entries[0].variant, "intl");
+        assert_eq!(entries[1].code, "de");
+        assert!(entries[1].variant.is_empty());
+    }
+
+    #[test]
+    fn formats_layouts_and_omits_empty_variants() {
+        let entries = vec![
+            LayoutEntry {
+                code: "us".to_string(),
+                variant: "intl".to_string(),
+            },
+            LayoutEntry {
+                code: "de".to_string(),
+                variant: String::new(),
+            },
+        ];
+        assert_eq!(format_entries(&entries), "us(intl),de");
     }
 
     #[test]

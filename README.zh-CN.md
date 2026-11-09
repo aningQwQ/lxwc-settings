@@ -114,6 +114,7 @@ src/
   services/       通用文件事务和后台 worker
   wlr/            WLR 适配器：wlr-randr 扫描、解析、模式命令
   labwc/          Labwc 适配器：rc.xml、environment、autostart、路径、重载
+  kanshi/         kanshi 适配器：配置路径、profile、托管标记块
   plugins/        无 UI 的预设，例如 LXQt 命令
   modules/        各设置页面的 UI 与业务状态
   ui/             侧边栏、状态栏和主题

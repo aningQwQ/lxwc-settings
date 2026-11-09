@@ -1,4 +1,24 @@
+use std::path::PathBuf;
+
 use crate::wlr::{Mode, OutputInfo};
+
+pub fn config_path() -> PathBuf {
+    std::env::var_os("LXWC_KANSHI_CONFIG")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            std::env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config"))
+                })
+                .unwrap_or_else(|| PathBuf::from(".config"))
+                .join("kanshi/config")
+        })
+}
+
+pub fn load(path: &std::path::Path) -> Result<crate::services::fs::LoadedFile, String> {
+    crate::services::fs::load(path)
+}
 
 const BEGIN: &str = "# BEGIN lxwc-settings dynamic display";
 const END: &str = "# END lxwc-settings dynamic display";

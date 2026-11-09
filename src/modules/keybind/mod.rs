@@ -12,7 +12,6 @@ use crate::labwc::{paths, rc_xml};
 use crate::modules::{
     Category, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, RC_XML_TASK_ID,
 };
-use crate::services::fs;
 
 use types::*;
 
@@ -56,10 +55,10 @@ impl KeybindModule {
     }
 
     fn reload_rc(&mut self, reset: bool) {
-        match fs::read_optional(&self.path) {
-            Ok((raw, exists)) => {
-                self.raw = raw;
-                self.exists = exists;
+        match rc_xml::load(&self.path) {
+            Ok(file) => {
+                self.raw = file.raw;
+                self.exists = file.exists;
                 match rc_xml::parse(&self.raw) {
                     Ok(keybinds) => {
                         self.baseline = keybinds;

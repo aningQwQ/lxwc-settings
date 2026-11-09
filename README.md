@@ -121,6 +121,7 @@ src/
   services/       Generic file transactions and the background worker
   wlr/            WLR adapter: wlr-randr scanning, parsing, mode commands
   labwc/          Labwc adapter: rc.xml, environment, autostart, paths, reconfigure
+  kanshi/         Kanshi adapter: config path, profiles, managed blocks
   plugins/        UI-free presets such as LXQt commands
   modules/        UI and business state for each settings page
   ui/             Sidebar, status bar, and theme

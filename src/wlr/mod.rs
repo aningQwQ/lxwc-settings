@@ -1,5 +1,3 @@
-use std::process::Command as ProcessCommand;
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mode {
     pub width: u32,
@@ -50,34 +48,44 @@ pub fn set_mode_command(output: &str, spec: &str) -> String {
 }
 
 pub fn set_mode(output: &str, spec: &str) -> Result<(), String> {
-    let result = ProcessCommand::new("wlr-randr")
-        .args(["--output", output, "--mode", spec])
-        .output()
+    let args = vec![
+        "--output".to_string(),
+        output.to_string(),
+        "--mode".to_string(),
+        spec.to_string(),
+    ];
+    let result = crate::services::process::run("wlr-randr", &args)
         .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
 
-    if result.status.success() {
+    if result.success {
         return Ok(());
     }
 
-    let stderr = String::from_utf8_lossy(&result.stderr);
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let detail = if stderr.trim().is_empty() {
-        stdout.trim()
+    let detail = if result.stderr.trim().is_empty() {
+        result.stdout.trim()
     } else {
-        stderr.trim()
+        result.stderr.trim()
     };
     Err(crate::trf!("wlr_randr_failed_to_switch_modes", detail))
 }
 
+pub fn scan_async() -> std::sync::mpsc::Receiver<Result<Vec<OutputInfo>, String>> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let _ = std::thread::Builder::new()
+        .name("lxwc-wlr-scan".to_string())
+        .spawn(move || {
+            let _ = tx.send(scan());
+        });
+    rx
+}
+
 pub fn scan() -> Result<Vec<OutputInfo>, String> {
-    let output = ProcessCommand::new("wlr-randr")
-        .output()
+    let output = crate::services::process::run("wlr-randr", &[])
         .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(crate::trf!("wlr_randr_failed", stderr.trim()));
+    if !output.success {
+        return Err(crate::trf!("wlr_randr_failed", output.stderr.trim()));
     }
-    Ok(parse(&String::from_utf8_lossy(&output.stdout)))
+    Ok(parse(&output.stdout))
 }
 
 pub fn parse(text: &str) -> Vec<OutputInfo> {
