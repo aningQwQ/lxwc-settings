@@ -1,6 +1,6 @@
 [package]
 name = "lxwc-settings"
-version = "1.4.1"
+version = "1.4.2"
 edition = "2021"
 description = "Labwc + LXQt lightweight settings center"
 license = "GPL-3.0-or-later"
