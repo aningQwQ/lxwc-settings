@@ -341,10 +341,10 @@ impl SettingsModule for KeybindModule {
     fn meta(&self) -> ModuleMeta {
         ModuleMeta {
             id: MODULE_ID,
-            title_key: "key_bindings",
+            title_key: "global_shortcuts",
             subtitle_key:
                 "type_any_keysym_combination_and_action_and_edit_rc_xml_keybindings_directly",
-            category: Category::Lxqt,
+            category: Category::Labwc,
         }
     }
 

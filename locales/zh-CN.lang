@@ -33,6 +33,7 @@ bri_2	亮度-
 calc	计算器
 cancel	取消
 cancel_editing	取消编辑
+choose_preset	选择预设…
 clear	清除
 clear_form	清空表单
 click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym	点击修饰键和主键即可组合；上方输入框仍可手输任意 keysym。
@@ -96,20 +97,29 @@ file_changed_externally	文件已被外部修改，请重新扫描后再试
 files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry	写入前会备份为 *.lxwc.bak；失败的任务会留在队列中等待重试。
 force_linear_buffers	强制线性显存
 from	原键 {}
+global_shortcuts	全局快捷键
 home	主页
 invalid_attribute_name	非法属性名：{}
 keep_this_mode	保留此设置
 key	主键
 key_2	按键
-key_bindings	快捷键绑定
 key_combination	按键组合
 keybind_changes	快捷键（{} 项变更）
 labwc_lxqt_control_center	Labwc × LXQt 控制中心
+labwc_module	Labwc 模块
 labwc_reload_failed	labwc 重载失败
 labwc_reload_failed_2	；labwc 重载失败：{}
 language	语言
 letters	字母
-lxqt_module	LXQt 模块
+lxqt_lock_screen	锁定屏幕
+lxqt_log_out	注销
+lxqt_open_file_manager	打开文件管理器
+lxqt_open_start_menu	呼出开始菜单
+lxqt_open_terminal	打开终端
+lxqt_presets	LXQt 预设
+lxqt_reboot	重启
+lxqt_show_desktop	显示桌面
+lxqt_shut_down	关机
 lxwc_settings	LXWC 设置
 lxwc_settings_2	LXWC 设置中心
 mail	邮件
@@ -144,6 +154,7 @@ play	播放
 power	电源
 prev	上一曲
 print	打印
+provided_by_the_lxqt_plugin	由无 UI 的 LXQt 插件提供
 queued	已加入队列：{} → {}
 queued_for_deletion	已加入删除队列：{}
 rc_xml_is_empty_cannot_write_key_bindings	rc.xml 内容为空，无法写入快捷键

@@ -33,6 +33,7 @@ bri_2	Bri-
 calc	Calc
 cancel	Cancel
 cancel_editing	Cancel editing
+choose_preset	Choose preset…
 clear	Clear
 clear_form	Clear form
 click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym	Click modifiers and a key to build the combination; the field above still accepts any keysym.
@@ -96,20 +97,29 @@ file_changed_externally	The file changed on disk; rescan and try again
 files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry	Files are backed up as *.lxwc.bak before writing. Failed tasks stay queued for retry.
 force_linear_buffers	Force linear buffers
 from	From {}
+global_shortcuts	Global Shortcuts
 home	Home
 invalid_attribute_name	Invalid attribute name: {}
 keep_this_mode	Keep this mode
 key	Key
 key_2	Key
-key_bindings	Key Bindings
 key_combination	Key combination
 keybind_changes	Key bindings ({} changes)
 labwc_lxqt_control_center	Labwc × LXQt Control Center
+labwc_module	Labwc Module
 labwc_reload_failed	labwc reload failed
 labwc_reload_failed_2	; labwc reload failed: {}
 language	Language
 letters	Letters
-lxqt_module	LXQt Module
+lxqt_lock_screen	Lock screen
+lxqt_log_out	Log out
+lxqt_open_file_manager	Open file manager
+lxqt_open_start_menu	Open start menu
+lxqt_open_terminal	Open terminal
+lxqt_presets	LXQt presets
+lxqt_reboot	Reboot
+lxqt_show_desktop	Show desktop
+lxqt_shut_down	Shut down
 lxwc_settings	LXWC Settings
 lxwc_settings_2	LXWC Settings
 mail	Mail
@@ -144,6 +154,7 @@ play	Play
 power	Power
 prev	Prev
 print	Print
+provided_by_the_lxqt_plugin	Provided by the UI-less LXQt plugin
 queued	Queued: {} → {}
 queued_for_deletion	Queued for deletion: {}
 rc_xml_is_empty_cannot_write_key_bindings	rc.xml is empty; cannot write key bindings

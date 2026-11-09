@@ -8,17 +8,17 @@ use crate::i18n::t;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Category {
     Wlr,
-    Lxqt,
+    Labwc,
     Environment,
 }
 
 impl Category {
-    pub const ALL: [Category; 3] = [Category::Wlr, Category::Lxqt, Category::Environment];
+    pub const ALL: [Category; 3] = [Category::Wlr, Category::Labwc, Category::Environment];
 
     pub fn label(self) -> &'static str {
         match self {
             Category::Wlr => t("wlr_module"),
-            Category::Lxqt => t("lxqt_module"),
+            Category::Labwc => t("labwc_module"),
             Category::Environment => t("environment_system"),
         }
     }
@@ -84,3 +84,4 @@ pub trait SettingsModule {
 pub mod display;
 pub mod env;
 pub mod keybind;
+pub mod lxqt;

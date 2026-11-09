@@ -119,6 +119,26 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
                     });
             });
             ui.horizontal(|ui| {
+                ui.label(t("lxqt_presets"));
+                egui::ComboBox::from_id_source("lxqt-presets")
+                    .selected_text(t("choose_preset"))
+                    .show_ui(ui, |ui| {
+                        for preset in crate::modules::lxqt::PRESETS {
+                            let response =
+                                ui.selectable_label(false, t(preset.label_key));
+                            if response.on_hover_text(preset.command).clicked() {
+                                module.form.action = preset.action.to_string();
+                                module.form.command = preset.command.to_string();
+                            }
+                        }
+                    });
+                ui.label(
+                    RichText::new(t("provided_by_the_lxqt_plugin"))
+                        .small()
+                        .weak(),
+                );
+            });
+            ui.horizontal(|ui| {
                 ui.label(t("command"));
                 ui.add(
                     egui::TextEdit::singleline(&mut module.form.command)

@@ -268,7 +268,10 @@ mod tests {
         let chinese = tables.get(&Lang::ZhCn).expect("Chinese catalog");
         assert_eq!(english.get("lxwc_settings").copied(), Some("LXWC Settings"));
         assert_eq!(chinese.get("lxwc_settings").copied(), Some("LXWC 设置"));
-        assert_eq!(english.get("key_bindings").copied(), Some("Key Bindings"));
+        assert_eq!(
+            english.get("global_shortcuts").copied(),
+            Some("Global Shortcuts")
+        );
         assert_eq!(english.get("current").copied(), Some(" (current)"));
         assert!(english.contains_key("failed_to_read"));
     }
