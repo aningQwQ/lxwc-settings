@@ -6,10 +6,17 @@ use eframe::egui;
 use crate::core::keybinds;
 use crate::core::model::*;
 use crate::core::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
+use crate::i18n::{self, t, Lang};
 use crate::modules;
 use crate::ui::{sidebar, status_bar, theme};
 
 pub const WATCHDOG_SECONDS: u64 = 15;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeybindView {
+    Edit,
+    Existing,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyPickTab {
@@ -124,11 +131,13 @@ pub struct App {
     pub outputs_error: Option<String>,
     pub scanning: bool,
     pub current: ModuleKind,
+    pub lang: Lang,
     pub env_desired: BTreeMap<&'static str, Option<String>>,
     pub keybind_form: KeybindForm,
     pub keybind_edits: Vec<KeybindEdit>,
     pub keybind_deletions: Vec<String>,
     pub keybind_filter: String,
+    pub keybind_view: KeybindView,
     pub keybind_pick_tab: KeyPickTab,
     pub selected_output: Option<String>,
     pub selected_mode: Option<Mode>,
@@ -146,6 +155,8 @@ pub struct App {
 
 impl App {
     pub fn new(ctx: &egui::Context) -> Self {
+        let lang = i18n::initial();
+        i18n::set_current(lang);
         let worker = WorkerHandle::spawn(ctx.clone());
         let app = Self {
             worker,
@@ -154,11 +165,13 @@ impl App {
             outputs_error: None,
             scanning: true,
             current: ModuleKind::Display,
+            lang,
             env_desired: BTreeMap::new(),
             keybind_form: KeybindForm::default(),
             keybind_edits: Vec::new(),
             keybind_deletions: Vec::new(),
             keybind_filter: String::new(),
+            keybind_view: KeybindView::Existing,
             keybind_pick_tab: KeyPickTab::Letters,
             selected_output: None,
             selected_mode: None,
@@ -187,8 +200,14 @@ impl App {
                 WorkerEvent::ModeApplied { output, result } => self.on_mode_applied(output, result),
                 WorkerEvent::ModeReverted { output, result } => {
                     self.status = Some(match result {
-                        Ok(()) => StatusMessage::info(format!("{output} 已还原到之前的模式")),
-                        Err(err) => StatusMessage::error(format!("还原失败：{err}")),
+                        Ok(()) => StatusMessage::info(crate::trf!(
+                            "{output} 已还原到之前的模式",
+                            "{output} restored to its previous mode",
+                        )),
+                        Err(err) => StatusMessage::error(crate::trf!(
+                            "还原失败：{err}",
+                            "Restore failed: {err}",
+                        )),
                     });
                     self.worker.send(WorkerRequest::ScanOutputs);
                 }
@@ -202,10 +221,16 @@ impl App {
                 let reset = self.reset_on_baseline || self.baseline.is_none();
                 self.reset_on_baseline = false;
                 self.adopt_baseline(baseline, reset);
-                self.status = Some(StatusMessage::info("配置已重新载入"));
+                self.status = Some(StatusMessage::info(t(
+                    "配置已重新载入",
+                    "Configuration reloaded",
+                )));
             }
             Err(err) => {
-                self.status = Some(StatusMessage::error(format!("读取配置失败：{err}")));
+                self.status = Some(StatusMessage::error(crate::trf!(
+                    "读取配置失败：{err}",
+                    "Failed to read configuration: {err}",
+                )));
             }
         }
     }
@@ -234,7 +259,10 @@ impl App {
             }
             Err(err) => {
                 self.outputs_error = Some(err.clone());
-                self.status = Some(StatusMessage::error(format!("扫描显示器失败：{err}")));
+                self.status = Some(StatusMessage::error(crate::trf!(
+                    "扫描显示器失败：{err}",
+                    "Display scan failed: {err}",
+                )));
             }
         }
     }
@@ -273,15 +301,27 @@ impl App {
 
         let success = report.success_count();
         let failure = report.failure_count();
-        let mut text = format!("执行完成：成功 {success} 项");
+        let mut text = crate::trf!(
+            "执行完成：成功 {success} 项",
+            "Done: {success} succeeded",
+        );
         if failure > 0 {
-            text.push_str(&format!("，失败 {failure} 项（已保留在队列）"));
+            text.push_str(&crate::trf!(
+                "，失败 {failure} 项（已保留在队列）",
+                ", {failure} failed (kept in queue)",
+            ));
         }
         if let Some(err) = &report.reconfigure_error {
-            text.push_str(&format!("；labwc 重载失败：{err}"));
+            text.push_str(&crate::trf!(
+                "；labwc 重载失败：{err}",
+                "; labwc reload failed: {err}",
+            ));
         }
         if let Some(err) = &reload_error {
-            text.push_str(&format!("；重读配置失败：{err}"));
+            text.push_str(&crate::trf!(
+                "；重读配置失败：{err}",
+                "; failed to reload configuration: {err}",
+            ));
         }
         self.status = Some(StatusMessage {
             text,
@@ -307,22 +347,27 @@ impl App {
                             previous,
                             deadline: Instant::now() + Duration::from_secs(WATCHDOG_SECONDS),
                         });
-                        self.status = Some(StatusMessage::info(format!(
+                        self.status = Some(StatusMessage::info(crate::trf!(
                             "已切换到 {}，{} 秒内确认否则自动回滚",
+                            "Switched to {}. Confirm within {} seconds or it will roll back",
                             mode.label(),
                             WATCHDOG_SECONDS
                         )));
                     }
                     _ => {
-                        self.status = Some(StatusMessage::error(
+                        self.status = Some(StatusMessage::error(t(
                             "已切换模式，但无法获取原模式，自动回滚未启用",
-                        ));
+                            "Mode switched, but the previous mode is unavailable; auto-rollback is disabled",
+                        )));
                     }
                 }
                 self.worker.send(WorkerRequest::ScanOutputs);
             }
             Err(err) => {
-                self.status = Some(StatusMessage::error(format!("切换失败：{err}")));
+                self.status = Some(StatusMessage::error(crate::trf!(
+                    "切换失败：{err}",
+                    "Failed to switch mode: {err}",
+                )));
                 self.worker.send(WorkerRequest::ScanOutputs);
             }
         }
@@ -379,8 +424,13 @@ impl App {
                 Some(value) => tasks.push(Task {
                     id: format!("env:{}={}", item.key, value),
                     module: ModuleKind::Environment,
-                    title: format!("设置 {}={}", item.key, value),
-                    detail: format!("{}：{}（重新登录后生效）", item.label, item.help),
+                    title: crate::trf!("设置 {}={}", "Set {}={}", item.key, value),
+                    detail: crate::trf!(
+                        "{}：{}（重新登录后生效）",
+                        "{}: {} (takes effect after re-login)",
+                        item.label(),
+                        item.help(),
+                    ),
                     action: TaskAction::EnvSet {
                         key: item.key.to_string(),
                         value,
@@ -389,8 +439,12 @@ impl App {
                 None => tasks.push(Task {
                     id: format!("env:{}", item.key),
                     module: ModuleKind::Environment,
-                    title: format!("移除环境变量 {}", item.key),
-                    detail: format!("从 environment 文件中删除 {}", item.key),
+                    title: crate::trf!("移除环境变量 {}", "Remove environment variable {}", item.key),
+                    detail: crate::trf!(
+                        "从 environment 文件中删除 {}",
+                        "Delete {} from the environment file",
+                        item.key,
+                    ),
                     action: TaskAction::EnvUnset {
                         key: item.key.to_string(),
                     },
@@ -410,7 +464,7 @@ impl App {
             tasks.push(Task {
                 id: keybind_remove_id(&entry.key),
                 module: ModuleKind::Keybind,
-                title: format!("删除快捷键 {}", entry.key),
+                title: crate::trf!("删除快捷键 {}", "Delete shortcut {}", entry.key),
                 detail: entry.summary(),
                 action: TaskAction::KeybindRemove {
                     key: entry.key.clone(),
@@ -442,7 +496,7 @@ impl App {
                         tasks.push(Task {
                             id: keybind_remove_id(&entry.key),
                             module: ModuleKind::Keybind,
-                            title: format!("删除快捷键 {}", entry.key),
+                            title: crate::trf!("删除快捷键 {}", "Delete shortcut {}", entry.key),
                             detail: entry.summary(),
                             action: TaskAction::KeybindRemove {
                                 key: entry.key.clone(),
@@ -460,11 +514,20 @@ impl App {
             tasks.push(Task {
                 id: keybind_add_id(edit),
                 module: ModuleKind::Keybind,
-                title: format!("快捷键 {} → {}", edit.key, edit.summary()),
+                title: crate::trf!(
+                    "快捷键 {} → {}",
+                    "Shortcut {} → {}",
+                    edit.key,
+                    edit.summary(),
+                ),
                 detail: if replace {
-                    "覆盖 rc.xml 中已有的同名按键".to_string()
+                    t(
+                        "覆盖 rc.xml 中已有的同名按键",
+                        "Overwrite the existing binding for this key in rc.xml",
+                    )
+                    .to_string()
                 } else {
-                    "写入新的快捷键绑定".to_string()
+                    t("写入新的快捷键绑定", "Write a new key binding").to_string()
                 },
                 action: TaskAction::KeybindAdd {
                     key: edit.key.clone(),
@@ -484,7 +547,10 @@ impl App {
         }
         self.confirm_open = false;
         self.reset_on_baseline = true;
-        self.status = Some(StatusMessage::info("正在重新读取配置文件…"));
+        self.status = Some(StatusMessage::info(t(
+            "正在重新读取配置文件…",
+            "Reloading configuration…",
+        )));
         self.worker.send(WorkerRequest::Refresh);
         if !self.scanning {
             self.scanning = true;
@@ -504,7 +570,7 @@ impl App {
             return;
         }
         self.applying = true;
-        self.status = Some(StatusMessage::info("正在执行队列…"));
+        self.status = Some(StatusMessage::info(t("正在执行队列…", "Applying changes…")));
         self.worker.send(WorkerRequest::ApplyTasks(self.pending.clone()));
     }
 
@@ -513,6 +579,7 @@ impl App {
     }
 
     pub fn load_keybind_for_edit(&mut self, key: &str) {
+        self.keybind_view = KeybindView::Edit;
         let normalized = keybinds::normalize_key(key);
 
         let pending_edit = self
@@ -613,7 +680,11 @@ impl App {
             };
             let command = form.command.trim().to_string();
             if form.action.trim() == "Execute" && command.is_empty() {
-                self.keybind_form.error = Some("Execute 动作必须填写命令".to_string());
+                self.keybind_form.error = Some(t(
+                    "Execute 动作必须填写命令",
+                    "The Execute action requires a command",
+                )
+                .to_string());
                 return;
             }
             vec![KeybindAction {
@@ -663,7 +734,11 @@ impl App {
                 .map(keybinds::normalize_key);
             if other_target == target || other_original.as_deref() == Some(target.as_str()) {
                 self.keybind_form.error =
-                    Some("目标按键与队列中的另一项修改冲突".to_string());
+                    Some(t(
+                    "目标按键与队列中的另一项修改冲突",
+                    "The target key conflicts with another queued change",
+                )
+                .to_string());
                 return;
             }
         }
@@ -683,10 +758,14 @@ impl App {
 
         let status = self.edit_status(&edit);
         if status == EditStatus::NoChange {
-            self.status = Some(StatusMessage::info("与现状一致，未加入队列"));
+            self.status = Some(StatusMessage::info(t(
+                "与现状一致，未加入队列",
+                "No change from the current state; not queued",
+            )));
         } else {
-            self.status = Some(StatusMessage::info(format!(
+            self.status = Some(StatusMessage::info(crate::trf!(
                 "已加入队列：{} → {}",
+                "Queued: {} → {}",
                 edit.key,
                 edit.summary()
             )));
@@ -776,7 +855,10 @@ impl App {
                 self.keybind_deletions.push(entry.key.clone());
             }
         }
-        self.status = Some(StatusMessage::info(format!("已加入删除队列：{key}")));
+        self.status = Some(StatusMessage::info(crate::trf!(
+            "已加入删除队列：{key}",
+            "Queued for deletion: {key}",
+        )));
     }
 
     pub fn undo_delete_keybind(&mut self, key: &str) {
@@ -835,7 +917,10 @@ impl App {
             return;
         };
         if !output.enabled || output.current.is_none() {
-            self.status = Some(StatusMessage::error("输出未启用，无法安全切换"));
+            self.status = Some(StatusMessage::error(t(
+                "输出未启用，无法安全切换",
+                "The output is disabled; refusing to switch",
+            )));
             return;
         }
         if output
@@ -850,7 +935,11 @@ impl App {
             mode: mode.clone(),
             previous: output.current.clone(),
         });
-        self.status = Some(StatusMessage::info(format!("正在切换到 {}…", mode.label())));
+        self.status = Some(StatusMessage::info(crate::trf!(
+            "正在切换到 {}…",
+            "Switching to {}…",
+            mode.label(),
+        )));
         self.worker.send(WorkerRequest::ApplyMode {
             output: output.name,
             spec: mode.spec(),
@@ -863,8 +952,9 @@ impl App {
                 output: watchdog.output.clone(),
                 spec: watchdog.previous.spec(),
             });
-            self.status = Some(StatusMessage::info(format!(
+            self.status = Some(StatusMessage::info(crate::trf!(
                 "正在还原 {} …",
+                "Restoring {}…",
                 watchdog.output
             )));
         }
@@ -891,13 +981,17 @@ impl App {
         let mut cancel = false;
         let mut go = false;
 
-        egui::Window::new("确认执行")
+        egui::Window::new(t("确认执行", "Confirm apply"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.set_min_width(520.0);
-                ui.label(format!("即将执行 {} 项变更：", tasks.len()));
+                ui.label(crate::trf!(
+                    "即将执行 {} 项变更：",
+                    "About to apply {} changes:",
+                    tasks.len(),
+                ));
                 ui.add_space(4.0);
                 egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
                     for (index, task) in tasks.iter().enumerate() {
@@ -911,18 +1005,19 @@ impl App {
                 });
                 ui.separator();
                 ui.label(
-                    egui::RichText::new(
+                    egui::RichText::new(t(
                         "写入前会备份为 *.lxwc.bak；失败的任务会留在队列中等待重试。",
-                    )
+                        "Files are backed up as *.lxwc.bak before writing. Failed tasks stay queued for retry.",
+                    ))
                     .small()
                     .weak(),
                 );
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    if ui.button("执行").clicked() {
+                    if ui.button(t("执行", "Apply")).clicked() {
                         go = true;
                     }
-                    if ui.button("取消").clicked() {
+                    if ui.button(t("取消", "Cancel")).clicked() {
                         cancel = true;
                     }
                 });
@@ -942,36 +1037,42 @@ impl App {
         let mut keep = false;
         let mut revert = false;
 
-        egui::Window::new("显示设置确认")
+        egui::Window::new(t("显示设置确认", "Confirm display mode"))
             .anchor(egui::Align2::CENTER_TOP, [0.0, 24.0])
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.set_min_width(380.0);
-                ui.label(format!(
+                ui.label(crate::trf!(
                     "{} 已切换到 {}",
+                    "{} switched to {}",
                     watchdog.output,
                     watchdog.mode.label()
                 ));
                 ui.add(
                     egui::ProgressBar::new(watchdog.fraction())
-                        .text(format!("{} 秒", watchdog.remaining_secs()))
+                        .text(crate::trf!(
+                            "{} 秒",
+                            "{} s",
+                            watchdog.remaining_secs(),
+                        ))
                         .animate(false),
                 );
-                ui.label(format!(
+                ui.label(crate::trf!(
                     "{} 秒后自动还原到 {}。",
+                    "{} seconds until auto-revert to {}.",
                     watchdog.remaining_secs(),
                     watchdog.previous.label()
                 ));
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    if ui.button("立即还原").clicked() {
+                    if ui.button(t("立即还原", "Roll back now")).clicked() {
                         revert = true;
                     }
                     if ui
                         .add(
                             egui::Button::new(
-                                egui::RichText::new("保留此设置")
+                                egui::RichText::new(t("保留此设置", "Keep this mode"))
                                     .strong()
                                     .color(egui::Color32::WHITE),
                             )
@@ -988,7 +1089,10 @@ impl App {
             self.revert_mode();
         } else if keep {
             self.watchdog = None;
-            self.status = Some(StatusMessage::info("已保留新的显示模式"));
+            self.status = Some(StatusMessage::info(t(
+                "已保留新的显示模式",
+                "New display mode kept",
+            )));
         }
     }
 
@@ -1002,13 +1106,16 @@ impl App {
         };
         let mut close = false;
 
-        egui::Window::new("执行报告")
+        egui::Window::new(t("执行报告", "Apply report"))
             .collapsible(false)
             .resizable(true)
             .default_width(560.0)
             .show(ctx, |ui| {
                 for file in &report.files {
-                    ui.label(format!("写入：{file}"));
+                    ui.label(crate::trf!(
+                        "写入：{file}",
+                        "Written: {file}",
+                    ));
                 }
                 if !report.files.is_empty() {
                     ui.separator();
@@ -1016,9 +1123,9 @@ impl App {
                 for result in &report.results {
                     ui.horizontal_wrapped(|ui| {
                         if result.ok {
-                            ui.colored_label(theme::OK, "成功");
+                            ui.colored_label(theme::OK, t("成功", "Success"));
                         } else {
-                            ui.colored_label(theme::DANGER, "失败");
+                            ui.colored_label(theme::DANGER, t("失败", "Failed"));
                         }
                         ui.label(&result.title);
                     });
@@ -1032,15 +1139,23 @@ impl App {
                 }
                 if let Some(err) = &report.reconfigure_error {
                     ui.separator();
-                    ui.colored_label(theme::DANGER, "labwc 重载失败");
+                    ui.colored_label(
+                        theme::DANGER,
+                        t("labwc 重载失败", "labwc reload failed"),
+                    );
                     ui.label(egui::RichText::new(err).small());
                 }
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new(format!("耗时 {} ms", report.elapsed_ms)).small(),
+                        egui::RichText::new(crate::trf!(
+                                "耗时 {} ms",
+                                "Took {} ms",
+                                report.elapsed_ms,
+                            ))
+                            .small(),
                     );
-                    if ui.button("关闭").clicked() {
+                    if ui.button(t("关闭", "Close")).clicked() {
                         close = true;
                     }
                 });
@@ -1054,6 +1169,7 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        i18n::set_current(self.lang);
         self.poll_events();
         self.update_watchdog(ctx);
         self.pending = self.build_tasks();
@@ -1063,19 +1179,23 @@ impl eframe::App for App {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             let module = self.current;
-            egui::ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    ui.add_space(6.0);
-                    ui.heading(module.title());
-                    ui.label(egui::RichText::new(module.subtitle()).weak());
-                    ui.add_space(10.0);
-                    match module {
-                        ModuleKind::Display => modules::display::show(self, ui),
-                        ModuleKind::Keybind => modules::keybind::show(self, ui),
-                        ModuleKind::Environment => modules::env::show(self, ui),
-                    }
-                });
+            ui.add_space(6.0);
+            ui.heading(module.title());
+            ui.label(egui::RichText::new(module.subtitle()).weak());
+            ui.add_space(10.0);
+            match module {
+                ModuleKind::Display => {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| modules::display::show(self, ui));
+                }
+                ModuleKind::Keybind => modules::keybind::show(self, ui),
+                ModuleKind::Environment => {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| modules::env::show(self, ui));
+                }
+            }
         });
 
         self.confirm_dialog(ctx);

@@ -1,11 +1,36 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::i18n::t;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ModuleKind {
     Display,
     Keybind,
     Environment,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Category {
+    Wlr,
+    Lxqt,
+    Environment,
+}
+
+impl Category {
+    pub const ALL: [Category; 3] = [
+        Category::Wlr,
+        Category::Lxqt,
+        Category::Environment,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Category::Wlr => t("WLR 模块", "WLR Module"),
+            Category::Lxqt => t("LXQt 模块", "LXQt Module"),
+            Category::Environment => t("环境/系统模块", "Environment / System"),
+        }
+    }
 }
 
 impl ModuleKind {
@@ -17,25 +42,34 @@ impl ModuleKind {
 
     pub fn title(self) -> &'static str {
         match self {
-            ModuleKind::Display => "显示与输出",
-            ModuleKind::Keybind => "快捷键与桌面集成",
-            ModuleKind::Environment => "环境变量魔改",
+            ModuleKind::Display => t("显示与输出", "Display & Output"),
+            ModuleKind::Keybind => t("快捷键绑定", "Key Bindings"),
+            ModuleKind::Environment => t("环境变量魔改", "Environment Tweaks"),
         }
     }
 
-    pub fn category(self) -> &'static str {
+    pub fn category(self) -> Category {
         match self {
-            ModuleKind::Display => "硬件与显示",
-            ModuleKind::Keybind => "桌面集成",
-            ModuleKind::Environment => "高级魔改",
+            ModuleKind::Display => Category::Wlr,
+            ModuleKind::Keybind => Category::Lxqt,
+            ModuleKind::Environment => Category::Environment,
         }
     }
 
     pub fn subtitle(self) -> &'static str {
         match self {
-            ModuleKind::Display => "直接通过 wlr-randr 管理输出，带 15 秒防变砖回滚。",
-            ModuleKind::Keybind => "手动填写任意 keysym 组合与动作，直接编辑 rc.xml 快捷键。",
-            ModuleKind::Environment => "修改 labwc environment，为串流与兼容性加开关。",
+            ModuleKind::Display => t(
+                "直接通过 wlr-randr 管理输出，带 15 秒防变砖回滚。",
+                "Manage outputs directly via wlr-randr, with a 15-second rollback watchdog.",
+            ),
+            ModuleKind::Keybind => t(
+                "手动填写任意 keysym 组合与动作，直接编辑 rc.xml 快捷键。",
+                "Type any keysym combination and action, and edit rc.xml keybindings directly.",
+            ),
+            ModuleKind::Environment => t(
+                "修改 labwc environment，为串流与兼容性加开关。",
+                "Edit labwc environment for streaming and compatibility switches.",
+            ),
         }
     }
 }
@@ -108,9 +142,14 @@ pub struct KeybindEntry {
 impl KeybindEntry {
     pub fn summary(&self) -> String {
         match self.actions.len() {
-            0 => "无动作".to_string(),
+            0 => t("无动作", "No action").to_string(),
             1 => self.actions[0].summary(),
-            count => format!("{}（{} 个动作）", self.actions[0].summary(), count),
+            count => crate::trf!(
+                "{}（{} 个动作）",
+                "{} ({} actions)",
+                self.actions[0].summary(),
+                count
+            ),
         }
     }
 }
@@ -126,9 +165,14 @@ pub struct KeybindEdit {
 impl KeybindEdit {
     pub fn summary(&self) -> String {
         match self.actions.len() {
-            0 => "无动作".to_string(),
+            0 => t("无动作", "No action").to_string(),
             1 => self.actions[0].summary(),
-            count => format!("{}（{} 个动作）", self.actions[0].summary(), count),
+            count => crate::trf!(
+                "{}（{} 个动作）",
+                "{} ({} actions)",
+                self.actions[0].summary(),
+                count
+            ),
         }
     }
 }
@@ -145,11 +189,11 @@ pub enum EditStatus {
 impl EditStatus {
     pub fn label(self) -> &'static str {
         match self {
-            EditStatus::New => "新增",
-            EditStatus::Overwrite => "覆盖",
-            EditStatus::Update => "更新",
-            EditStatus::Rename => "改键",
-            EditStatus::NoChange => "无变化",
+            EditStatus::New => t("新增", "New"),
+            EditStatus::Overwrite => t("覆盖", "Overwrite"),
+            EditStatus::Update => t("更新", "Update"),
+            EditStatus::Rename => t("改键", "Rename"),
+            EditStatus::NoChange => t("无变化", "No change"),
         }
     }
 }
@@ -217,20 +261,36 @@ impl ApplyReport {
 
 pub struct ManagedEnv {
     pub key: &'static str,
-    pub label: &'static str,
-    pub help: &'static str,
+    pub label_zh: &'static str,
+    pub label_en: &'static str,
+    pub help_zh: &'static str,
+    pub help_en: &'static str,
+}
+
+impl ManagedEnv {
+    pub fn label(&self) -> &'static str {
+        t(self.label_zh, self.label_en)
+    }
+
+    pub fn help(&self) -> &'static str {
+        t(self.help_zh, self.help_en)
+    }
 }
 
 pub const MANAGED_ENV: [ManagedEnv; 2] = [
     ManagedEnv {
         key: "WLR_DRM_NO_MODIFIERS",
-        label: "强制线性显存",
-        help: "规避部分串流、虚拟显示在 GPU 修饰符下的黑屏和花屏。",
+        label_zh: "强制线性显存",
+        label_en: "Force linear buffers",
+        help_zh: "规避部分串流、虚拟显示在 GPU 修饰符下的黑屏和花屏。",
+        help_en: "Avoid black screens or corruption with some streaming and virtual outputs caused by GPU modifiers.",
     },
     ManagedEnv {
         key: "WLR_NO_HARDWARE_CURSORS",
-        label: "禁用硬件光标",
-        help: "改用软件光标，修复远程串流时鼠标消失或残影。",
+        label_zh: "禁用硬件光标",
+        label_en: "Disable hardware cursors",
+        help_zh: "改用软件光标，修复远程串流时鼠标消失或残影。",
+        help_en: "Use a software cursor to fix disappearing or ghosting cursors during remote streaming.",
     },
 ];
 

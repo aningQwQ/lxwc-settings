@@ -1,5 +1,6 @@
 mod app;
 mod core;
+mod i18n;
 mod modules;
 mod ui;
 
@@ -23,11 +24,14 @@ fn load_system_cjk_font() -> Option<Vec<u8>> {
 }
 
 fn main() -> eframe::Result<()> {
+    let lang = i18n::initial();
+    i18n::set_current(lang);
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1060.0, 760.0])
             .with_min_inner_size([880.0, 620.0])
-            .with_title("LXWC 设置中心"),
+            .with_title(i18n::t("LXWC 设置中心", "LXWC Settings")),
         ..Default::default()
     };
 

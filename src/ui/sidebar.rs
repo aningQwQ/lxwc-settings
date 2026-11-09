@@ -1,7 +1,8 @@
 use eframe::egui::{self, RichText};
 
 use crate::app::App;
-use crate::core::model::ModuleKind;
+use crate::core::model::{Category, ModuleKind};
+use crate::i18n::{self, t, Lang};
 
 pub fn show(app: &mut App, ctx: &egui::Context) {
     egui::SidePanel::left("sidebar")
@@ -9,14 +10,41 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .resizable(false)
         .show(ctx, |ui| {
             ui.add_space(12.0);
-            ui.heading("LXWC 设置");
-            ui.label(RichText::new("Labwc × LXQt 控制中心").small().weak());
+            ui.heading(t("LXWC 设置", "LXWC Settings"));
+            ui.label(
+                RichText::new(t(
+                    "Labwc × LXQt 控制中心",
+                    "Labwc × LXQt Control Center",
+                ))
+                .small()
+                .weak(),
+            );
+
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(t("语言", "Language")).small().weak());
+                let mut new_lang = app.lang;
+                egui::ComboBox::from_id_source("language-select")
+                    .selected_text(app.lang.label())
+                    .width(120.0)
+                    .show_ui(ui, |ui| {
+                        for lang in Lang::ALL {
+                            ui.selectable_value(&mut new_lang, lang, lang.label());
+                        }
+                    });
+                if new_lang != app.lang {
+                    app.lang = new_lang;
+                    i18n::set_current(new_lang);
+                    i18n::save(new_lang);
+                }
+            });
+
             ui.add_space(6.0);
             ui.separator();
 
-            for category in ["硬件与显示", "桌面集成", "高级魔改"] {
+            for category in Category::ALL {
                 ui.add_space(8.0);
-                ui.label(RichText::new(category).small().weak());
+                ui.label(RichText::new(category.label()).small().weak());
                 for module in ModuleKind::ALL
                     .into_iter()
                     .filter(|module| module.category() == category)

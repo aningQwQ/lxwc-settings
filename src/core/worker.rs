@@ -153,7 +153,7 @@ fn apply_tasks(tasks: &[Task]) -> ApplyReport {
         let path = config::rc_path();
         let outcome = (|| -> Result<(), String> {
             let raw = std::fs::read_to_string(&path)
-                .map_err(|err| format!("读取 {} 失败：{err}", path.display()))?;
+                .map_err(|err| crate::trf!("读取 {} 失败：{err}", "Failed to read {}: {err}", path.display()))?;
             let mut additions = Vec::new();
             let mut remove_keys: Vec<String> = Vec::new();
 
@@ -223,12 +223,13 @@ fn reconfigure_labwc() -> Result<(), String> {
     let output = ProcessCommand::new("pkill")
         .args(["-HUP", "-x", "labwc"])
         .output()
-        .map_err(|err| format!("无法调用 pkill：{err}"))?;
+        .map_err(|err| crate::trf!("无法调用 pkill：{err}", "Failed to invoke pkill: {err}"))?;
     if output.status.success() {
         Ok(())
     } else {
-        Err(format!(
+        Err(crate::trf!(
             "pkill -HUP labwc 失败：{}",
+            "pkill -HUP labwc failed: {}",
             String::from_utf8_lossy(&output.stderr).trim()
         ))
     }
@@ -238,7 +239,7 @@ fn run_wlr_randr(output: &str, spec: &str) -> Result<(), String> {
     let result = ProcessCommand::new("wlr-randr")
         .args(["--output", output, "--mode", spec])
         .output()
-        .map_err(|err| format!("无法执行 wlr-randr：{err}"))?;
+        .map_err(|err| crate::trf!("无法执行 wlr-randr：{err}", "Failed to run wlr-randr: {err}"))?;
 
     if result.status.success() {
         return Ok(());
@@ -251,5 +252,8 @@ fn run_wlr_randr(output: &str, spec: &str) -> Result<(), String> {
     } else {
         stderr.trim()
     };
-    Err(format!("wlr-randr 切换模式失败：{detail}"))
+    Err(crate::trf!(
+        "wlr-randr 切换模式失败：{detail}",
+        "wlr-randr failed to switch modes: {detail}"
+    ))
 }

@@ -30,7 +30,7 @@ pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok((text, true)),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok((String::new(), false)),
-        Err(err) => Err(format!("读取 {} 失败：{err}", path.display())),
+        Err(err) => Err(crate::trf!("读取 {} 失败：{err}", "Failed to read {}: {err}", path.display())),
     }
 }
 
@@ -60,18 +60,26 @@ pub fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
 
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|err| format!("创建目录 {} 失败：{err}", parent.display()))?;
+            .map_err(|err| crate::trf!(
+            "创建目录 {} 失败：{err}",
+            "Failed to create directory {}: {err}",
+            parent.display()
+        ))?;
     }
 
     if path.exists() {
         let backup = with_suffix(path, ".lxwc.bak");
         std::fs::copy(path, &backup)
-            .map_err(|err| format!("备份 {} 失败：{err}", path.display()))?;
+            .map_err(|err| crate::trf!("备份 {} 失败：{err}", "Failed to back up {}: {err}", path.display()))?;
     }
 
     let tmp = with_suffix(path, ".lxwc.tmp");
     std::fs::write(&tmp, contents)
-        .map_err(|err| format!("写入临时文件 {} 失败：{err}", tmp.display()))?;
+        .map_err(|err| crate::trf!(
+        "写入临时文件 {} 失败：{err}",
+        "Failed to write temporary file {}: {err}",
+        tmp.display()
+    ))?;
 
     if let Ok(meta) = std::fs::metadata(path) {
         let _ = std::fs::set_permissions(&tmp, meta.permissions());
@@ -79,7 +87,7 @@ pub fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
 
     std::fs::rename(&tmp, path).map_err(|err| {
         let _ = std::fs::remove_file(&tmp);
-        format!("替换 {} 失败：{err}", path.display())
+        crate::trf!("替换 {} 失败：{err}", "Failed to replace {}: {err}", path.display())
     })
 }
 

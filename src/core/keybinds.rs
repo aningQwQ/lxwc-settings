@@ -42,10 +42,18 @@ pub fn normalize_key(key: &str) -> String {
 pub fn validate_combo(input: &str) -> Result<String, String> {
     let trimmed = input.trim();
     if trimmed.is_empty() {
-        return Err("请输入按键组合，例如 W-C-S-t".to_string());
+        return Err(crate::i18n::t(
+            "请输入按键组合，例如 W-C-S-t",
+            "Enter a key combination, e.g. W-C-S-t",
+        )
+        .to_string());
     }
     if trimmed.chars().any(char::is_whitespace) {
-        return Err("按键组合中不能包含空格".to_string());
+        return Err(crate::i18n::t(
+            "按键组合中不能包含空格",
+            "The key combination cannot contain spaces",
+        )
+        .to_string());
     }
 
     let mut sup = false;
@@ -56,7 +64,11 @@ pub fn validate_combo(input: &str) -> Result<String, String> {
 
     for part in trimmed.split('-') {
         if part.is_empty() {
-            return Err("组合中不能出现空段".to_string());
+            return Err(crate::i18n::t(
+            "组合中不能出现空段",
+            "The combination contains an empty segment",
+        )
+        .to_string());
         }
         match part {
             "W" => sup = true,
@@ -68,7 +80,11 @@ pub fn validate_combo(input: &str) -> Result<String, String> {
     }
 
     if bases.len() != 1 {
-        return Err("只能包含一个主键；修饰键请用大写 W / C / A / S".to_string());
+        return Err(crate::i18n::t(
+            "只能包含一个主键；修饰键请用大写 W / C / A / S",
+            "Exactly one main key is required; use uppercase W / C / A / S for modifiers",
+        )
+        .to_string());
     }
 
     let base = bases[0];
@@ -76,7 +92,11 @@ pub fn validate_combo(input: &str) -> Result<String, String> {
         .chars()
         .all(|character| character.is_ascii_alphanumeric() || character == '_')
     {
-        return Err("主键只支持 keysym 名称（字母、数字、下划线）".to_string());
+        return Err(crate::i18n::t(
+            "主键只支持 keysym 名称（字母、数字、下划线）",
+            "The main key must be an XKB keysym name (letters, digits, underscores)",
+        )
+        .to_string());
     }
 
     let mut out = String::new();
@@ -93,13 +113,17 @@ pub fn validate_combo(input: &str) -> Result<String, String> {
 pub fn validate_action_name(name: &str) -> Result<(), String> {
     let trimmed = name.trim();
     if trimmed.is_empty() {
-        return Err("动作名称不能为空".to_string());
+        return Err(crate::i18n::t("动作名称不能为空", "Action name cannot be empty").to_string());
     }
     if !trimmed
         .chars()
         .all(|character| character.is_ascii_alphanumeric() || character == '_')
     {
-        return Err("动作名称只能包含字母、数字、下划线".to_string());
+        return Err(crate::i18n::t(
+            "动作名称只能包含字母、数字、下划线",
+            "Action name may only contain letters, digits and underscores",
+        )
+        .to_string());
     }
     Ok(())
 }
@@ -120,18 +144,22 @@ pub fn parse_attrs(input: &str) -> Result<Vec<(String, String)>, String> {
             .find(|character: char| {
                 character == '=' || character.is_whitespace() || character == ','
             })
-            .ok_or_else(|| "属性格式应为 key=value".to_string())?;
+            .ok_or_else(|| crate::i18n::t("属性格式应为 key=value", "Attributes must use key=value").to_string())?;
         let name = rest[..name_end].trim();
         if !is_valid_attr_name(name) {
-            return Err(format!("非法属性名：{name}"));
+            return Err(crate::trf!("非法属性名：{name}", "Invalid attribute name: {name}"));
         }
         if name == "name" || name == "command" {
-            return Err("name / command 请在专用输入框填写".to_string());
+            return Err(crate::i18n::t(
+            "name / command 请在专用输入框填写",
+            "Enter name / command in their dedicated fields",
+        )
+        .to_string());
         }
 
         rest = rest[name_end..].trim_start();
         let Some(after_eq) = rest.strip_prefix('=') else {
-            return Err(format!("属性 {name} 缺少等号"));
+            return Err(crate::trf!("属性 {name} 缺少等号", "Attribute {name} is missing '='"));
         };
         rest = after_eq.trim_start();
 
@@ -141,7 +169,10 @@ pub fn parse_attrs(input: &str) -> Result<Vec<(String, String)>, String> {
             let body = &rest[1..];
             let end = body
                 .find(quote)
-                .ok_or_else(|| format!("属性 {name} 的引号未闭合"))?;
+                .ok_or_else(|| crate::trf!(
+                "属性 {name} 的引号未闭合",
+                "Attribute {name} has an unclosed quote"
+            ))?;
             value = body[..end].to_string();
             rest = &body[end + 1..];
         } else {
@@ -153,7 +184,7 @@ pub fn parse_attrs(input: &str) -> Result<Vec<(String, String)>, String> {
         }
 
         if attrs.iter().any(|(existing, _)| existing == name) {
-            return Err(format!("属性 {name} 重复"));
+            return Err(crate::trf!("属性 {name} 重复", "Attribute {name} is duplicated"));
         }
         attrs.push((name.to_string(), value));
     }
@@ -165,13 +196,17 @@ pub fn parse_actions_fragment(fragment: &str) -> Result<Vec<KeybindAction>, Stri
     let wrapped = format!(
         "<keyboard><keybind key=\"W-F24\">{fragment}</keybind></keyboard>"
     );
-    let entries = parse(&wrapped).map_err(|err| format!("动作 XML 解析失败：{err}"))?;
+    let entries = parse(&wrapped).map_err(|err| crate::trf!("动作 XML 解析失败：{err}", "Failed to parse action XML: {err}"))?;
     if entries.len() != 1 {
-        return Err("只能填写 action 元素，不能包含额外的 keybind/keyboard".to_string());
+        return Err(crate::i18n::t(
+            "只能填写 action 元素，不能包含额外的 keybind/keyboard",
+            "Only action elements are allowed; extra keybind/keyboard elements are not",
+        )
+        .to_string());
     }
     let actions = entries[0].actions.clone();
     if actions.is_empty() {
-        return Err("至少需要一个 <action>".to_string());
+        return Err(crate::i18n::t("至少需要一个 <action>", "At least one <action> is required").to_string());
     }
     for action in &actions {
         validate_action_name(&action.name)?;
@@ -379,7 +414,7 @@ pub fn parse(raw: &str) -> Result<Vec<KeybindEntry>, String> {
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
-            Err(err) => return Err(format!("解析 rc.xml 失败：{err}")),
+            Err(err) => return Err(crate::trf!("解析 rc.xml 失败：{err}", "Failed to parse rc.xml: {err}")),
         }
     }
 
@@ -388,17 +423,25 @@ pub fn parse(raw: &str) -> Result<Vec<KeybindEntry>, String> {
 
 pub fn patch(raw: &str, additions: &[Addition], remove_keys: &[String]) -> Result<String, String> {
     if raw.trim().is_empty() {
-        return Err("rc.xml 内容为空，无法写入快捷键".to_string());
+        return Err(crate::i18n::t(
+            "rc.xml 内容为空，无法写入快捷键",
+            "rc.xml is empty; cannot write key bindings",
+        )
+        .to_string());
     }
     if additions.is_empty() && remove_keys.is_empty() {
         return Ok(raw.to_string());
     }
     if !raw.contains("</keyboard>") {
-        return Err("rc.xml 中未找到 </keyboard> 节点".to_string());
+        return Err(crate::i18n::t(
+            "rc.xml 中未找到 </keyboard> 节点",
+            "No </keyboard> node found in rc.xml",
+        )
+        .to_string());
     }
     for addition in additions {
         if addition.actions.is_empty() {
-            return Err(format!("快捷键 {} 没有动作", addition.key));
+            return Err(crate::trf!("快捷键 {} 没有动作", "Shortcut {} has no action", addition.key));
         }
     }
 
@@ -461,7 +504,7 @@ pub fn patch(raw: &str, additions: &[Addition], remove_keys: &[String]) -> Resul
             }
             Ok(Event::Eof) => break,
             Ok(_) => {}
-            Err(err) => return Err(format!("解析 rc.xml 失败：{err}")),
+            Err(err) => return Err(crate::trf!("解析 rc.xml 失败：{err}", "Failed to parse rc.xml: {err}")),
         }
     }
 
@@ -479,7 +522,11 @@ pub fn patch(raw: &str, additions: &[Addition], remove_keys: &[String]) -> Resul
     if !additions.is_empty() {
         let close_pos = out
             .rfind("</keyboard>")
-            .ok_or_else(|| "rc.xml 中未找到 </keyboard> 节点".to_string())?;
+            .ok_or_else(|| crate::i18n::t(
+            "rc.xml 中未找到 </keyboard> 节点",
+            "No </keyboard> node found in rc.xml",
+        )
+        .to_string())?;
         let indent = detect_indent(raw);
         let close_indent = detect_close_indent(raw);
         let (insert_at, leading_newline) = match out[..close_pos].rfind('\n') {
@@ -520,7 +567,10 @@ pub fn patch(raw: &str, additions: &[Addition], remove_keys: &[String]) -> Resul
         out.replace_range(insert_at..close_pos, &block);
     }
 
-    parse(&out).map_err(|err| format!("写入后的 rc.xml 无法解析，已取消：{err}"))?;
+    parse(&out).map_err(|err| crate::trf!(
+        "写入后的 rc.xml 无法解析，已取消：{err}",
+        "The patched rc.xml could not be parsed; changes were cancelled: {err}"
+    ))?;
     Ok(out)
 }
 
