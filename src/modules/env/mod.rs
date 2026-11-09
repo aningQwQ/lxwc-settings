@@ -3,14 +3,14 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 
-use crate::core::model::{ApplyReport, Effect, Task};
+use crate::core::model::ApplyReport;
 use crate::i18n::t;
 use crate::labwc::{environment, paths};
-use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
+use crate::modules::{
+    Category, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, ENVIRONMENT_TASK_ID,
+};
 use crate::services::fs;
 use crate::ui::theme;
-
-const ENV_TASK_ID: &str = "env";
 
 struct ManagedEnv {
     key: &'static str,
@@ -83,7 +83,13 @@ impl EnvModule {
         }
     }
 
-    fn pending_task(&self) -> Option<Task> {
+    fn has_changes(&self) -> bool {
+        MANAGED_ENV.iter().any(|item| {
+            self.desired.get(item.key).cloned().flatten() != self.baseline.get(item.key).cloned()
+        })
+    }
+
+    fn patch(&self, raw: &str) -> Option<PatchOutcome> {
         let mut sets = BTreeMap::new();
         let mut unsets = Vec::new();
         let mut changes = Vec::new();
@@ -110,21 +116,10 @@ impl EnvModule {
             return None;
         }
 
-        Some(Task {
-            id: ENV_TASK_ID.to_string(),
-            module_id: "env",
-            title: crate::trf!("environment_changes", changes.len()),
-            detail: changes.join(", "),
-            change_count: changes.len(),
-            effects: vec![Effect::WriteFile {
-                path: self.path.clone(),
-                contents: environment::patch(&self.raw, &sets, &unsets),
-                expected: if self.exists {
-                    Some(self.raw.clone())
-                } else {
-                    None
-                },
-            }],
+        Some(PatchOutcome {
+            contents: environment::patch(raw, &sets, &unsets),
+            summary: changes.join(", "),
+            count: changes.len(),
         })
     }
 }
@@ -143,8 +138,8 @@ impl SettingsModule for EnvModule {
         self.reload(true);
     }
 
-    fn pending(&mut self) -> Vec<Task> {
-        self.pending_task().into_iter().collect()
+    fn environment_patch(&mut self, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        Ok(self.patch(raw))
     }
 
     fn on_applied(&mut self, _report: &ApplyReport) {
@@ -169,8 +164,8 @@ impl SettingsModule for EnvModule {
             );
         }
 
-        if self.pending_task().is_some() {
-            if let Some(err) = ctx.failures.get(ENV_TASK_ID) {
+        if self.has_changes() {
+            if let Some(err) = ctx.failures.get(ENVIRONMENT_TASK_ID) {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }
         }
@@ -226,7 +221,27 @@ impl SettingsModule for EnvModule {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::model::TaskResult;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn report(ok: bool) -> ApplyReport {
+        ApplyReport {
+            results: vec![TaskResult {
+                id: ENVIRONMENT_TASK_ID.to_string(),
+                module_id: ENVIRONMENT_TASK_ID,
+                title: "environment".to_string(),
+                change_count: 1,
+                ok,
+                error: if ok {
+                    None
+                } else {
+                    Some("write failed".to_string())
+                },
+            }],
+            warnings: Vec::new(),
+            elapsed_ms: 0,
+        }
+    }
 
     fn temp_env_path() -> (PathBuf, PathBuf) {
         let unique = SystemTime::now()
@@ -262,22 +277,18 @@ mod tests {
             .desired
             .insert("WLR_NO_HARDWARE_CURSORS", Some("1".to_string()));
 
-        let tasks = module.pending();
-        assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].change_count, 2);
+        let raw = module.raw.clone();
+        let patch = module.environment_patch(&raw).unwrap().unwrap();
+        assert_eq!(patch.count, 2);
+        assert!(patch.contents.contains("WLR_DRM_NO_MODIFIERS=1"));
+        assert!(patch.contents.contains("WLR_NO_HARDWARE_CURSORS=1"));
 
-        let Effect::WriteFile { path, contents, .. } = &tasks[0].effects[0] else {
-            panic!("expected file write");
-        };
-        assert!(contents.contains("WLR_DRM_NO_MODIFIERS=1"));
-        assert!(contents.contains("WLR_NO_HARDWARE_CURSORS=1"));
+        module.on_applied(&report(false));
+        assert!(module.has_changes());
 
-        module.on_applied(&ApplyReport::default());
-        assert_eq!(module.pending().len(), 1);
-
-        std::fs::write(path, contents).unwrap();
-        module.on_applied(&ApplyReport::default());
-        assert!(module.pending().is_empty());
+        std::fs::write(path, &patch.contents).unwrap();
+        module.on_applied(&report(true));
+        assert!(!module.has_changes());
 
         std::fs::remove_dir_all(dir).ok();
     }
@@ -290,10 +301,10 @@ mod tests {
         let mut module = EnvModule::with_path(path);
         module.refresh();
         module.desired.insert("WLR_NO_HARDWARE_CURSORS", None);
-        assert!(module.pending().len() == 1);
+        assert!(module.has_changes());
 
         module.refresh();
-        assert!(module.pending().is_empty());
+        assert!(!module.has_changes());
 
         std::fs::remove_dir_all(dir).ok();
     }

@@ -290,3 +290,120 @@ wlr_randr_failed_to_switch_modes	wlr-randr failed to switch modes: {}
 write_a_new_key_binding	Write a new key binding
 written	Written: {}
 xml_preview	XML preview
+
+add	Add
+adaptive	Adaptive
+add_layout	Add layout
+alt_caps_lock	Alt+Caps Lock
+alt_shift	Alt+Shift
+alt_space	Alt+Space
+always	Always
+appearance	Appearance
+appearance_subtitle	Window theme, icons, decorations and shadows.
+automatic	Automatic
+button_areas	Button areas
+caps_lock	Caps Lock
+cascade	Cascade
+center	Center
+clickfinger	Clickfinger
+client_side_decoration	Client side (CSD)
+corner_radius	Corner radius
+ctrl_alt	Ctrl+Alt
+ctrl_shift	Ctrl+Shift
+cursor	Cursor
+cursor_size	Cursor size
+custom	Custom
+custom_acceleration_curves_not_implemented	Custom acceleration curves are not implemented yet; existing curves are preserved.
+decoration	Decoration
+default	Default
+disable_while_typing	Disable while typing
+disable_with_external_mouse	Disable with external mouse
+drag_lock	Drag lock
+draw_contents_while_resizing	Draw contents while resizing
+drop_shadows	Drop shadows
+drop_shadows_on_tiled	Shadows on tiled windows
+edge	Edge
+environment_variables_need_a_new_session	Cursor and keyboard environment variables take effect after a new session.
+flat	Flat
+focus	Focus
+focus_follows_mouse	Focus follows mouse
+focus_follows_mouse_requires_movement	Require cursor movement
+gap	Gap
+full_screen_magnifier_hint	Set width and height to -1 for full-screen magnification.
+height	Height
+icon_theme	Icon theme
+increment	Increment
+initial_scale	Initial scale
+inverted	Inverted
+keyboard	Keyboard
+keyboard_layouts	Layouts
+keyboard_repeat	Key repeat
+keyboard_subtitle	Layouts, repeat rate and NumLock.
+layout_switch_options	Switch options
+layout_variant	Variant
+left_handed	Left-handed
+left_middle_right	Left-middle-right
+left_right_middle	Left-right-middle
+magnifier	Magnifier
+maximize_on_top_edge	Maximize on top edge
+maximized_decoration	Maximized decoration
+middle_button_emulation	Middle button emulation
+mouse_touchpad	Mouse & Touchpad
+mouse_touchpad_subtitle	Pointer, tapping, scrolling and cursor settings.
+natural_scroll	Natural scrolling
+never	Never
+none	None
+nonpixel	Non-pixel
+normal	Normal
+numlock	Enable NumLock
+on_button	On button
+only_on_edges	Only on edges
+only_on_regions	Only on regions
+placement	Placement
+pointer	Pointer
+pointer_speed	Pointer speed
+presets	Presets
+raise_on_focus	Raise window on focus
+raise_on_focus_delay	Raise delay (ms)
+rc_xml_changes	{} rc.xml change(s)
+rc_xml_has_unbalanced_nodes	rc.xml has unbalanced nodes.
+rc_xml_is_empty	rc.xml is empty.
+rc_xml_root_node_not_found	The rc.xml root node {} was not found.
+repeat_delay	Repeat delay (ms)
+repeat_rate	Repeat rate (per second)
+resistance	Edge resistance
+resize	Resize
+resize_corner_range	Resize corner range
+resize_minimum_area	Minimum resize area
+rotate_left	Rotate left
+rotate_right	Rotate right
+screen_edge_strength	Screen edge strength
+scroll_factor	Scroll factor
+scrolling	Scrolling
+select_layout	Select layout...
+server_side_decoration	Server side (SSD)
+shift_caps_lock	Shift+Caps Lock
+show_snap_overlay	Show snap overlay
+snap_corner_range	Corner range (px)
+snapping	Snapping
+tap_and_drag	Tap and drag
+tap_to_click	Tap to click
+tapping	Tapping
+titlebar	Titlebar
+touchscreen	Touchscreen
+touchscreen_rotation	Rotation
+touchscreen_rotation_help	Choose the calibration matrix that matches the physical orientation.
+touchscreen_subtitle	Calibration matrix for touch input.
+three_finger_drag	Three-finger drag
+two_finger	Two finger
+unmaximize_threshold	Unmaximize threshold
+unsnap_threshold	Unsnap threshold
+use_bilinear_filter	Use bilinear filter
+width	Width
+win_space	Win+Space
+window_behaviour	Window Behaviour
+window_behaviour_subtitle	Placement, focus, snapping, resistance, resize and magnifier.
+window_decoration	Window decoration
+window_edge_strength	Window edge strength
+window_theme	Window theme
+invalid_configuration_path	Invalid configuration path.

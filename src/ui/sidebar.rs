@@ -46,8 +46,9 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     let count: usize = app
                         .pending
                         .iter()
-                        .filter(|task| task.module_id == meta.id)
-                        .map(|task| task.change_count)
+                        .flat_map(|task| task.attribution.iter())
+                        .filter(|(module_id, _)| *module_id == meta.id)
+                        .map(|(_, count)| *count)
                         .sum();
                     let title = t(meta.title_key);
                     let text = if count > 0 {

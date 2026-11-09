@@ -1,10 +1,15 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use eframe::egui;
 
-use crate::core::model::{ApplyReport, Task};
+use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::{self, t, Lang};
-use crate::modules::{self, ModuleCtx, SettingsModule, StatusMessage};
+use crate::labwc::{environment, paths, rc_xml, reconfigure};
+use crate::modules::{
+    self, ConfigTarget, ModuleCtx, SettingsModule, StatusMessage, ENVIRONMENT_TASK_ID,
+    RC_XML_TASK_ID,
+};
+use crate::services::fs;
 use crate::services::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::ui::{sidebar, status_bar, theme};
 
@@ -29,6 +34,11 @@ impl App {
 
         let mut modules: Vec<Box<dyn SettingsModule>> = vec![
             Box::new(modules::display::DisplayModule::new(ctx)),
+            Box::new(modules::appearance::AppearanceModule::new()),
+            Box::new(modules::behaviour::BehaviourModule::new()),
+            Box::new(modules::mouse::MouseModule::new()),
+            Box::new(modules::keyboard::KeyboardModule::new()),
+            Box::new(modules::touchscreen::TouchscreenModule::new()),
             Box::new(modules::keybind::KeybindModule::new()),
             Box::new(modules::labwc_display::LabwcDisplayModule::new()),
             Box::new(modules::env::EnvModule::new()),
@@ -51,6 +61,181 @@ impl App {
             report: None,
             report_open: false,
         }
+    }
+
+    fn collect_tasks(&mut self) -> Vec<Task> {
+        let mut tasks = Vec::new();
+        for module in &mut self.modules {
+            tasks.extend(module.pending());
+        }
+
+        let rc_path = paths::rc_xml();
+        let env_path = paths::environment();
+        let mut errors = Vec::new();
+
+        let (mut rc_raw, rc_exists) = match fs::read_optional(&rc_path) {
+            Ok(value) => value,
+            Err(err) => {
+                errors.push(err);
+                (String::new(), false)
+            }
+        };
+        let (mut env_raw, env_exists) = match fs::read_optional(&env_path) {
+            Ok(value) => value,
+            Err(err) => {
+                errors.push(err);
+                (String::new(), false)
+            }
+        };
+        let rc_expected = rc_exists.then(|| rc_raw.clone());
+        let env_expected = env_exists.then(|| env_raw.clone());
+
+        let mut rc_summaries = Vec::new();
+        let mut env_summaries = Vec::new();
+        let mut rc_counts: HashMap<&'static str, usize> = HashMap::new();
+        let mut env_counts: HashMap<&'static str, usize> = HashMap::new();
+        let mut env_sets = BTreeMap::new();
+        let mut env_unsets = Vec::new();
+        let mut active_env = environment::parse_active(&env_raw);
+
+        for module in &mut self.modules {
+            let module_id = module.meta().id;
+            for edit in module.config_edits() {
+                match edit.target {
+                    ConfigTarget::RcXml => {
+                        let current = rc_xml::get(&rc_raw, &edit.key);
+                        let unchanged = match &edit.value {
+                            Some(value) => current.as_deref() == Some(value.as_str()),
+                            None => current.is_none(),
+                        };
+                        if unchanged {
+                            continue;
+                        }
+                        let result = match &edit.value {
+                            Some(value) => rc_xml::set(&rc_raw, &edit.key, value),
+                            None => rc_xml::remove(&rc_raw, &edit.key),
+                        };
+                        match result {
+                            Ok(next) => {
+                                rc_raw = next;
+                                rc_summaries.push(edit.summary);
+                                *rc_counts.entry(module_id).or_default() += 1;
+                            }
+                            Err(err) => errors.push(err),
+                        }
+                    }
+                    ConfigTarget::Environment => {
+                        let current = active_env.get(&edit.key).cloned();
+                        let unchanged = match &edit.value {
+                            Some(value) => current.as_deref() == Some(value.as_str()),
+                            None => current.is_none(),
+                        };
+                        if unchanged {
+                            continue;
+                        }
+                        match edit.value {
+                            Some(value) => {
+                                env_sets.insert(edit.key.clone(), value.clone());
+                                active_env.insert(edit.key.clone(), value);
+                            }
+                            None => {
+                                if !env_unsets.iter().any(|key| key == &edit.key) {
+                                    env_unsets.push(edit.key.clone());
+                                }
+                                active_env.remove(&edit.key);
+                            }
+                        }
+                        env_summaries.push(edit.summary);
+                        *env_counts.entry(module_id).or_default() += 1;
+                    }
+                }
+            }
+        }
+
+        if !env_sets.is_empty() || !env_unsets.is_empty() {
+            env_raw = environment::patch(&env_raw, &env_sets, &env_unsets);
+        }
+
+        for module in &mut self.modules {
+            let module_id = module.meta().id;
+
+            match module.rc_xml_patch(&rc_raw) {
+                Ok(Some(patch)) => {
+                    if patch.count > 0 {
+                        rc_raw = patch.contents;
+                        rc_summaries.push(patch.summary);
+                        *rc_counts.entry(module_id).or_default() += patch.count;
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => errors.push(err),
+            }
+
+            match module.environment_patch(&env_raw) {
+                Ok(Some(patch)) => {
+                    if patch.count > 0 {
+                        env_raw = patch.contents;
+                        env_summaries.push(patch.summary);
+                        *env_counts.entry(module_id).or_default() += patch.count;
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => errors.push(err),
+            }
+        }
+
+        let rc_count: usize = rc_counts.values().sum();
+        let env_count: usize = env_counts.values().sum();
+        let mut rc_attribution = rc_counts.into_iter().collect::<Vec<_>>();
+        let mut env_attribution = env_counts.into_iter().collect::<Vec<_>>();
+        rc_attribution.sort_by_key(|(module_id, _)| *module_id);
+        env_attribution.sort_by_key(|(module_id, _)| *module_id);
+
+        if rc_count > 0 {
+            let command = reconfigure::command();
+            tasks.push(Task {
+                id: RC_XML_TASK_ID.to_string(),
+                module_id: RC_XML_TASK_ID,
+                title: crate::trf!("rc_xml_changes", rc_count),
+                detail: rc_summaries.join("; "),
+                change_count: rc_count,
+                attribution: rc_attribution,
+                effects: vec![
+                    Effect::WriteFile {
+                        path: rc_path,
+                        contents: rc_raw,
+                        expected: rc_expected,
+                    },
+                    Effect::RunCommand {
+                        program: command.program,
+                        args: command.args,
+                        best_effort: true,
+                    },
+                ],
+            });
+        }
+
+        if env_count > 0 {
+            tasks.push(Task {
+                id: ENVIRONMENT_TASK_ID.to_string(),
+                module_id: ENVIRONMENT_TASK_ID,
+                title: crate::trf!("environment_changes", env_count),
+                detail: env_summaries.join("; "),
+                change_count: env_count,
+                attribution: env_attribution,
+                effects: vec![Effect::WriteFile {
+                    path: env_path,
+                    contents: env_raw,
+                    expected: env_expected,
+                }],
+            });
+        }
+
+        if let Some(error) = errors.into_iter().next() {
+            self.status = Some(StatusMessage::error(error));
+        }
+
+        tasks
     }
 
     fn poll_events(&mut self) {
@@ -245,13 +430,7 @@ impl eframe::App for App {
             }
         }
 
-        {
-            let mut tasks = Vec::new();
-            for module in &mut self.modules {
-                tasks.extend(module.pending());
-            }
-            self.pending = tasks;
-        }
+        self.pending = self.collect_tasks();
 
         sidebar::show(self, ctx);
         status_bar::show(self, ctx);

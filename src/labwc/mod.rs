@@ -1,6 +1,8 @@
 pub mod actions;
 pub mod autostart;
 pub mod environment;
+pub mod layouts;
 pub mod paths;
 pub mod rc_xml;
 pub mod reconfigure;
+pub mod themes;

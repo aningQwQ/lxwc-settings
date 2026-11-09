@@ -5,6 +5,30 @@ use eframe::egui;
 use crate::core::model::{ApplyReport, Task};
 use crate::i18n::t;
 
+pub const RC_XML_TASK_ID: &str = "rc-xml";
+pub const ENVIRONMENT_TASK_ID: &str = "environment";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConfigTarget {
+    RcXml,
+    Environment,
+}
+
+#[derive(Clone, Debug)]
+pub struct ConfigEdit {
+    pub target: ConfigTarget,
+    pub key: String,
+    pub value: Option<String>,
+    pub summary: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct PatchOutcome {
+    pub contents: String,
+    pub summary: String,
+    pub count: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Category {
     Wlr,
@@ -82,9 +106,23 @@ impl ModuleCtx<'_> {
 pub trait SettingsModule {
     fn meta(&self) -> ModuleMeta;
     fn refresh(&mut self);
-    fn pending(&mut self) -> Vec<Task>;
+    fn pending(&mut self) -> Vec<Task> {
+        Vec::new()
+    }
     fn on_applied(&mut self, report: &ApplyReport);
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut ModuleCtx);
+
+    fn config_edits(&mut self) -> Vec<ConfigEdit> {
+        Vec::new()
+    }
+
+    fn rc_xml_patch(&mut self, _raw: &str) -> Result<Option<PatchOutcome>, String> {
+        Ok(None)
+    }
+
+    fn environment_patch(&mut self, _raw: &str) -> Result<Option<PatchOutcome>, String> {
+        Ok(None)
+    }
 
     fn on_message(&mut self, _payload: &ModulePayload) {}
 
@@ -93,7 +131,14 @@ pub trait SettingsModule {
     fn overlay(&mut self, _ui_ctx: &egui::Context, _ctx: &mut ModuleCtx) {}
 }
 
+mod scalar;
+
+pub mod appearance;
+pub mod behaviour;
 pub mod display;
 pub mod env;
 pub mod keybind;
+pub mod keyboard;
 pub mod labwc_display;
+pub mod mouse;
+pub mod touchscreen;

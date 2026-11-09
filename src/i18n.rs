@@ -272,8 +272,11 @@ mod tests {
             english.get("global_shortcuts").copied(),
             Some("Global Shortcuts")
         );
+        assert_eq!(english.get("appearance").copied(), Some("Appearance"));
+        assert_eq!(chinese.get("window_behaviour").copied(), Some("窗口行为"));
         assert_eq!(english.get("current").copied(), Some(" (current)"));
         assert!(english.contains_key("failed_to_read"));
+        assert!(english.contains_key("rc_xml_changes"));
     }
 
     #[test]

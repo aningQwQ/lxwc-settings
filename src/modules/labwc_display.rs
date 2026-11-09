@@ -139,6 +139,7 @@ impl LabwcDisplayModule {
             title: t("persist_default_display").to_string(),
             detail: format!("{} {} — {}", output_name, mode.label(), command),
             change_count: 1,
+            attribution: vec![(MODULE_ID, 1)],
             effects: vec![Effect::WriteFile {
                 path: self.autostart_path.clone(),
                 contents,

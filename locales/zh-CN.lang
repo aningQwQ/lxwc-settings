@@ -290,3 +290,120 @@ wlr_randr_failed_to_switch_modes	wlr-randr 切换模式失败：{}
 write_a_new_key_binding	写入新的快捷键绑定
 written	写入：{}
 xml_preview	XML 预览
+
+add	添加
+adaptive	自适应
+add_layout	添加布局
+alt_caps_lock	Alt+Caps Lock
+alt_shift	Alt+Shift
+alt_space	Alt+Space
+always	总是
+appearance	外观
+appearance_subtitle	窗口主题、图标、装饰与阴影。
+automatic	自动
+button_areas	按钮区域
+caps_lock	Caps Lock
+cascade	层叠
+center	居中
+clickfinger	点击手指数
+client_side_decoration	客户端装饰（CSD）
+corner_radius	圆角半径
+ctrl_alt	Ctrl+Alt
+ctrl_shift	Ctrl+Shift
+cursor	光标
+cursor_size	光标大小
+custom	自定义
+custom_acceleration_curves_not_implemented	暂未实现自定义加速曲线编辑，现有曲线会保留。
+decoration	装饰方式
+default	默认
+disable_while_typing	输入时禁用触摸板
+disable_with_external_mouse	外接鼠标时禁用
+drag_lock	拖动锁定
+draw_contents_while_resizing	缩放时绘制内容
+drop_shadows	窗口阴影
+drop_shadows_on_tiled	平铺窗口阴影
+edge	边缘
+environment_variables_need_a_new_session	光标与键盘环境变量将在新会话中生效。
+flat	线性
+focus	焦点
+focus_follows_mouse	焦点跟随鼠标
+focus_follows_mouse_requires_movement	需要移动光标
+gap	窗口间距
+full_screen_magnifier_hint	宽高设为 -1 可启用全屏放大。
+height	高度
+icon_theme	图标主题
+increment	步进
+initial_scale	初始倍率
+inverted	倒置
+keyboard	键盘
+keyboard_layouts	键盘布局
+keyboard_repeat	按键重复
+keyboard_subtitle	布局、重复速率与 NumLock。
+layout_switch_options	切换选项
+layout_variant	变体
+left_handed	左手模式
+left_middle_right	左-中-右
+left_right_middle	左-右-中
+magnifier	放大镜
+maximize_on_top_edge	顶边最大化
+maximized_decoration	最大化装饰
+middle_button_emulation	中键模拟
+mouse_touchpad	鼠标与触控板
+mouse_touchpad_subtitle	指针、点按、滚动与光标设置。
+natural_scroll	自然滚动
+never	从不
+none	无
+nonpixel	非像素
+normal	正常
+numlock	启用 NumLock
+on_button	按键
+only_on_edges	仅边缘
+only_on_regions	仅区域
+placement	放置策略
+pointer	指针
+pointer_speed	指针速度
+presets	预设
+raise_on_focus	聚焦时置顶
+raise_on_focus_delay	置顶延迟（毫秒）
+rc_xml_changes	{} 项 rc.xml 变更
+rc_xml_has_unbalanced_nodes	rc.xml 节点不平衡。
+rc_xml_is_empty	rc.xml 为空。
+rc_xml_root_node_not_found	未找到 rc.xml 根节点 {}。
+repeat_delay	重复延迟（毫秒）
+repeat_rate	重复速率（次/秒）
+resistance	边缘阻力
+resize	缩放
+resize_corner_range	缩放角落范围
+resize_minimum_area	最小缩放区域
+rotate_left	左转
+rotate_right	右转
+screen_edge_strength	屏幕边缘强度
+scroll_factor	滚动系数
+scrolling	滚动
+select_layout	选择布局…
+server_side_decoration	服务端装饰（SSD）
+shift_caps_lock	Shift+Caps Lock
+show_snap_overlay	显示吸附提示
+snap_corner_range	角落范围（像素）
+snapping	窗口吸附
+tap_and_drag	点按拖动
+tap_to_click	点按代替单击
+tapping	点按
+titlebar	标题栏
+touchscreen	触摸屏
+touchscreen_rotation	旋转
+touchscreen_rotation_help	选择与设备物理方向匹配的校准矩阵。
+touchscreen_subtitle	触摸输入的校准矩阵。
+three_finger_drag	三指拖动
+two_finger	双指
+unmaximize_threshold	取消最大化阈值
+unsnap_threshold	取消吸附阈值
+use_bilinear_filter	使用双线性过滤
+width	宽度
+win_space	Win+Space
+window_behaviour	窗口行为
+window_behaviour_subtitle	放置、焦点、吸附、阻力、缩放与放大镜。
+window_decoration	窗口装饰
+window_edge_strength	窗口边缘强度
+window_theme	窗口主题
+invalid_configuration_path	配置路径无效。

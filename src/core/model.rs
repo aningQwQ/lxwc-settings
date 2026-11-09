@@ -21,6 +21,7 @@ pub struct Task {
     pub title: String,
     pub detail: String,
     pub change_count: usize,
+    pub attribution: Vec<(&'static str, usize)>,
     pub effects: Vec<Effect>,
 }
 

@@ -5,17 +5,18 @@ use std::path::PathBuf;
 
 use eframe::egui;
 
-use crate::core::model::{ApplyReport, Effect, Task};
+use crate::core::model::ApplyReport;
 use crate::i18n::t;
 use crate::labwc::rc_xml::{KeybindAction, KeybindEntry};
-use crate::labwc::{paths, rc_xml, reconfigure};
-use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
+use crate::labwc::{paths, rc_xml};
+use crate::modules::{
+    Category, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, RC_XML_TASK_ID,
+};
 use crate::services::fs;
 
 use types::*;
 
 const MODULE_ID: &str = "keybind";
-const TASK_ID: &str = "keybind";
 
 pub struct KeybindModule {
     path: PathBuf,
@@ -347,105 +348,92 @@ impl SettingsModule for KeybindModule {
         self.reload_rc(true);
     }
 
-    fn pending(&mut self) -> Vec<Task> {
-        let mut tasks = Vec::new();
+    fn rc_xml_patch(&mut self, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        if !self.exists {
+            return Ok(None);
+        }
 
-        if self.exists {
-            let mut additions = Vec::new();
-            let mut remove_keys = Vec::new();
-            let mut changes = Vec::new();
+        let mut additions = Vec::new();
+        let mut remove_keys = Vec::new();
+        let mut changes = Vec::new();
 
-            for deletion in &self.deletions {
-                let normalized = rc_xml::normalize_key(deletion);
-                let Some(entry) = self
-                    .baseline
-                    .iter()
-                    .find(|entry| rc_xml::normalize_key(&entry.key) == normalized)
-                else {
-                    continue;
-                };
-                changes.push(format!("-{}", entry.key));
-                Self::push_unique(&mut remove_keys, &entry.key);
+        for deletion in &self.deletions {
+            let normalized = rc_xml::normalize_key(deletion);
+            let Some(entry) = self
+                .baseline
+                .iter()
+                .find(|entry| rc_xml::normalize_key(&entry.key) == normalized)
+            else {
+                continue;
+            };
+            changes.push(format!("-{}", entry.key));
+            Self::push_unique(&mut remove_keys, &entry.key);
+        }
+
+        for edit in &self.edits {
+            if self.edit_status(edit) == EditStatus::NoChange {
+                continue;
             }
 
-            for edit in &self.edits {
-                if self.edit_status(edit) == EditStatus::NoChange {
-                    continue;
-                }
+            let target = rc_xml::normalize_key(&edit.key);
+            let target_entry = self
+                .baseline
+                .iter()
+                .find(|entry| rc_xml::normalize_key(&entry.key) == target);
 
-                let target = rc_xml::normalize_key(&edit.key);
-                let target_entry = self
+            if let Some(original) = &edit.original_key {
+                let original_norm = rc_xml::normalize_key(original);
+                if let Some(entry) = self
                     .baseline
                     .iter()
-                    .find(|entry| rc_xml::normalize_key(&entry.key) == target);
-
-                if let Some(original) = &edit.original_key {
-                    let original_norm = rc_xml::normalize_key(original);
-                    if let Some(entry) = self
-                        .baseline
-                        .iter()
-                        .find(|entry| rc_xml::normalize_key(&entry.key) == original_norm)
-                    {
-                        if original_norm != target {
-                            changes.push(format!("{} → {}", entry.key, edit.key));
-                            Self::push_unique(&mut remove_keys, &entry.key);
-                        } else {
-                            changes.push(edit.key.clone());
-                        }
+                    .find(|entry| rc_xml::normalize_key(&entry.key) == original_norm)
+                {
+                    if original_norm != target {
+                        changes.push(format!("{} → {}", entry.key, edit.key));
+                        Self::push_unique(&mut remove_keys, &entry.key);
                     } else {
                         changes.push(edit.key.clone());
                     }
                 } else {
-                    changes.push(format!("+{}", edit.key));
+                    changes.push(edit.key.clone());
                 }
-
-                if target_entry.is_some() {
-                    Self::push_unique(&mut remove_keys, &edit.key);
-                }
-                additions.push(rc_xml::Addition {
-                    key: edit.key.clone(),
-                    attrs: edit.attrs.clone(),
-                    actions: edit.actions.clone(),
-                });
+            } else {
+                changes.push(format!("+{}", edit.key));
             }
 
-            if !changes.is_empty() {
-                match rc_xml::patch(&self.raw, &additions, &remove_keys) {
-                    Ok(patched) => {
-                        self.error = None;
-                        tasks.push(Task {
-                            id: TASK_ID.to_string(),
-                            module_id: MODULE_ID,
-                            title: crate::trf!("keybind_changes", changes.len()),
-                            detail: changes.join("; "),
-                            change_count: changes.len(),
-                            effects: vec![
-                                Effect::WriteFile {
-                                    path: self.path.clone(),
-                                    contents: patched,
-                                    expected: if self.exists {
-                                        Some(self.raw.clone())
-                                    } else {
-                                        None
-                                    },
-                                },
-                                reconfigure_effect(),
-                            ],
-                        });
-                    }
-                    Err(err) => {
-                        self.error = Some(err);
-                    }
-                }
+            if target_entry.is_some() {
+                Self::push_unique(&mut remove_keys, &edit.key);
             }
+            additions.push(rc_xml::Addition {
+                key: edit.key.clone(),
+                attrs: edit.attrs.clone(),
+                actions: edit.actions.clone(),
+            });
         }
 
-        tasks
+        if changes.is_empty() {
+            return Ok(None);
+        }
+
+        match rc_xml::patch(raw, &additions, &remove_keys) {
+            Ok(contents) => {
+                self.error = None;
+                Ok(Some(PatchOutcome {
+                    contents,
+                    summary: changes.join("; "),
+                    count: changes.len(),
+                }))
+            }
+            Err(err) => {
+                self.error = Some(err.clone());
+                Err(err)
+            }
+        }
     }
 
     fn on_applied(&mut self, report: &ApplyReport) {
-        let keybind_ok = report.task_succeeded(MODULE_ID, TASK_ID);
-        let keybind_failed = report.task_failed(MODULE_ID, TASK_ID);
+        let keybind_ok = report.task_succeeded(RC_XML_TASK_ID, RC_XML_TASK_ID);
+        let keybind_failed = report.task_failed(RC_XML_TASK_ID, RC_XML_TASK_ID);
         if keybind_ok || keybind_failed {
             self.reload_rc(false);
             if keybind_ok {
@@ -460,15 +448,6 @@ impl SettingsModule for KeybindModule {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
         ui::show(self, ui, ctx);
-    }
-}
-
-fn reconfigure_effect() -> Effect {
-    let command = reconfigure::command();
-    Effect::RunCommand {
-        program: command.program,
-        args: command.args,
-        best_effort: true,
     }
 }
 
@@ -521,8 +500,8 @@ mod tests {
     fn report(ok: bool) -> ApplyReport {
         ApplyReport {
             results: vec![TaskResult {
-                id: TASK_ID.to_string(),
-                module_id: MODULE_ID,
+                id: RC_XML_TASK_ID.to_string(),
+                module_id: RC_XML_TASK_ID,
                 title: "keybind".to_string(),
                 change_count: 1,
                 ok,
@@ -543,20 +522,16 @@ mod tests {
         let mut module = KeybindModule::with_path(path);
         module.edits.push(edit("W-t"));
 
-        let tasks = module.pending();
-        assert_eq!(tasks.len(), 1);
-        assert_eq!(tasks[0].change_count, 1);
-        assert!(matches!(tasks[0].effects[1], Effect::RunCommand { .. }));
-
-        let Effect::WriteFile { path, contents, .. } = &tasks[0].effects[0] else {
-            panic!("expected file write");
-        };
-        assert!(contents.contains("key=\"W-t\""));
-        std::fs::write(path, contents).unwrap();
+        let raw = module.raw.clone();
+        let patch = module.rc_xml_patch(&raw).unwrap().unwrap();
+        assert_eq!(patch.count, 1);
+        assert!(patch.contents.contains("key=\"W-t\""));
+        std::fs::write(module.path.clone(), &patch.contents).unwrap();
 
         module.on_applied(&report(true));
         assert!(module.edits.is_empty());
-        assert!(module.pending().is_empty());
+        let raw = module.raw.clone();
+        assert!(module.rc_xml_patch(&raw).unwrap().is_none());
 
         std::fs::remove_dir_all(dir).ok();
     }
@@ -569,7 +544,8 @@ mod tests {
 
         module.on_applied(&report(false));
         assert_eq!(module.edits.len(), 1);
-        assert_eq!(module.pending().len(), 1);
+        let raw = module.raw.clone();
+        assert!(module.rc_xml_patch(&raw).unwrap().is_some());
 
         std::fs::remove_dir_all(dir).ok();
     }

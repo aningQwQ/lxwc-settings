@@ -158,6 +158,350 @@ pub fn validate_action_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn get(raw: &str, path: &str) -> Option<String> {
+    if raw.trim().is_empty() {
+        return None;
+    }
+    let tree = parse_tree(raw).ok()?;
+    let segments = split_path(path);
+    let node = find_node(&tree, &segments)?;
+    if node.self_closing {
+        return None;
+    }
+    let inner = &raw[node.start_end..node.end_start];
+    if inner.contains('<') {
+        return None;
+    }
+    let value = unescape(inner.trim())
+        .map(|value| value.into_owned())
+        .unwrap_or_else(|_| inner.trim().to_string());
+    Some(value)
+}
+
+pub fn set(raw: &str, path: &str, value: &str) -> Result<String, String> {
+    let segments = split_path(path);
+    if segments.is_empty() {
+        return Err(crate::i18n::t("invalid_configuration_path").to_string());
+    }
+
+    let owned;
+    let base = if raw.trim().is_empty() {
+        owned = "<labwc_config>\n</labwc_config>\n".to_string();
+        owned.as_str()
+    } else {
+        raw
+    };
+
+    let tree = parse_tree(base)?;
+    if !tree
+        .iter()
+        .any(|node| node.name.eq_ignore_ascii_case(segments[0]))
+    {
+        return Err(crate::trf!("rc_xml_root_node_not_found", segments[0]));
+    }
+
+    let output = if let Some(node) = find_node(&tree, &segments) {
+        replace_value(base, node, value)
+    } else {
+        insert_value(base, &tree, &segments, value)?
+    };
+
+    validate_xml(&output)?;
+    Ok(output)
+}
+
+pub fn remove(raw: &str, path: &str) -> Result<String, String> {
+    if raw.trim().is_empty() {
+        return Ok(raw.to_string());
+    }
+    let tree = parse_tree(raw)?;
+    let segments = split_path(path);
+    let Some(node) = find_node(&tree, &segments) else {
+        return Ok(raw.to_string());
+    };
+    let start = extend_start(raw, node.start);
+    let mut end = node.end;
+    while end < raw.len() && matches!(raw.as_bytes()[end], b' ' | b'\t') {
+        end += 1;
+    }
+    if end < raw.len() && raw.as_bytes()[end] == b'\r' {
+        end += 1;
+    }
+    if end < raw.len() && raw.as_bytes()[end] == b'\n' {
+        end += 1;
+    }
+    let mut output = String::with_capacity(raw.len());
+    output.push_str(&raw[..start]);
+    output.push_str(&raw[end..]);
+    validate_xml(&output)?;
+    Ok(output)
+}
+
+struct XmlNode {
+    name: String,
+    start: usize,
+    start_end: usize,
+    end_start: usize,
+    end: usize,
+    self_closing: bool,
+    children: Vec<XmlNode>,
+}
+
+fn parse_tree(raw: &str) -> Result<Vec<XmlNode>, String> {
+    let mut reader = Reader::from_str(raw);
+    reader.config_mut().trim_text(false);
+
+    let mut stack: Vec<XmlNode> = Vec::new();
+    let mut roots: Vec<XmlNode> = Vec::new();
+
+    loop {
+        let start = reader.buffer_position() as usize;
+        match reader.read_event() {
+            Ok(Event::Start(event)) => {
+                let name = String::from_utf8_lossy(event.local_name().as_ref()).to_string();
+                stack.push(XmlNode {
+                    name,
+                    start,
+                    start_end: reader.buffer_position() as usize,
+                    end_start: 0,
+                    end: 0,
+                    self_closing: false,
+                    children: Vec::new(),
+                });
+            }
+            Ok(Event::Empty(event)) => {
+                let name = String::from_utf8_lossy(event.local_name().as_ref()).to_string();
+                let end = reader.buffer_position() as usize;
+                attach_node(
+                    &mut stack,
+                    &mut roots,
+                    XmlNode {
+                        name,
+                        start,
+                        start_end: end,
+                        end_start: start,
+                        end,
+                        self_closing: true,
+                        children: Vec::new(),
+                    },
+                );
+            }
+            Ok(Event::End(_)) => {
+                let mut node = stack
+                    .pop()
+                    .ok_or_else(|| crate::i18n::t("rc_xml_has_unbalanced_nodes").to_string())?;
+                node.end_start = start;
+                node.end = reader.buffer_position() as usize;
+                attach_node(&mut stack, &mut roots, node);
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(err) => return Err(crate::trf!("failed_to_parse_rc_xml", err)),
+        }
+    }
+
+    if !stack.is_empty() {
+        return Err(crate::i18n::t("rc_xml_has_unbalanced_nodes").to_string());
+    }
+    Ok(roots)
+}
+
+fn attach_node(stack: &mut Vec<XmlNode>, roots: &mut Vec<XmlNode>, node: XmlNode) {
+    if let Some(parent) = stack.last_mut() {
+        parent.children.push(node);
+    } else {
+        roots.push(node);
+    }
+}
+
+fn split_path(path: &str) -> Vec<&str> {
+    path.split('/').filter(|part| !part.is_empty()).collect()
+}
+
+fn find_node<'a>(nodes: &'a [XmlNode], segments: &[&str]) -> Option<&'a XmlNode> {
+    let first = segments.first()?;
+    let node = nodes
+        .iter()
+        .find(|node| node.name.eq_ignore_ascii_case(first))?;
+    if segments.len() == 1 {
+        Some(node)
+    } else {
+        find_node(&node.children, &segments[1..])
+    }
+}
+
+fn deepest_node<'a>(nodes: &'a [XmlNode], segments: &[&str]) -> Option<(&'a XmlNode, usize)> {
+    let first = segments.first()?;
+    let node = nodes
+        .iter()
+        .find(|node| node.name.eq_ignore_ascii_case(first))?;
+    if segments.len() == 1 {
+        return Some((node, 1));
+    }
+    if let Some((child, matched)) = deepest_node(&node.children, &segments[1..]) {
+        Some((child, matched + 1))
+    } else {
+        Some((node, 1))
+    }
+}
+
+fn replace_value(raw: &str, node: &XmlNode, value: &str) -> String {
+    let mut output = String::with_capacity(raw.len() + value.len());
+    output.push_str(&raw[..node.start]);
+    if node.self_closing {
+        if value.is_empty() {
+            output.push_str(&raw[node.start..node.end]);
+        } else {
+            let start_tag = &raw[node.start..node.start_end];
+            let open = start_tag
+                .strip_suffix("/>")
+                .or_else(|| start_tag.strip_suffix('>'))
+                .unwrap_or(start_tag)
+                .trim_end();
+            output.push_str(open);
+            output.push('>');
+            output.push_str(&escape_xml(value));
+            output.push_str("</");
+            output.push_str(&node.name);
+            output.push('>');
+        }
+    } else {
+        output.push_str(&raw[node.start..node.start_end]);
+        output.push_str(&escape_xml(value));
+    }
+    if node.self_closing {
+        output.push_str(&raw[node.end..]);
+    } else {
+        output.push_str(&raw[node.end_start..]);
+    }
+    output
+}
+
+fn insert_value(
+    raw: &str,
+    roots: &[XmlNode],
+    segments: &[&str],
+    value: &str,
+) -> Result<String, String> {
+    let (ancestor, matched) = deepest_node(roots, segments)
+        .ok_or_else(|| crate::i18n::t("rc_xml_root_node_not_found").to_string())?;
+    let missing = &segments[matched..];
+    if missing.is_empty() {
+        return Ok(raw.to_string());
+    }
+
+    let ancestor_indent = line_indent(raw, ancestor.start);
+    let unit = indent_unit(raw);
+    let child_indent = ancestor
+        .children
+        .first()
+        .map(|child| line_indent(raw, child.start))
+        .filter(|indent| indent.len() > ancestor_indent.len())
+        .unwrap_or_else(|| format!("{ancestor_indent}{unit}"));
+
+    let mut block = String::new();
+    let indent_at = |level: usize| format!("{child_indent}{}", unit.repeat(level));
+    for (level, name) in missing.iter().enumerate().take(missing.len() - 1) {
+        block.push_str(&indent_at(level));
+        block.push('<');
+        block.push_str(name);
+        block.push_str(">\n");
+    }
+    let last_level = missing.len() - 1;
+    block.push_str(&indent_at(last_level));
+    block.push('<');
+    block.push_str(missing[last_level]);
+    if value.is_empty() {
+        block.push_str(" />\n");
+    } else {
+        block.push('>');
+        block.push_str(&escape_xml(value));
+        block.push_str("</");
+        block.push_str(missing[last_level]);
+        block.push_str(">\n");
+    }
+    for level in (0..last_level).rev() {
+        block.push_str(&indent_at(level));
+        block.push_str("</");
+        block.push_str(missing[level]);
+        block.push_str(">\n");
+    }
+
+    let mut output = String::with_capacity(raw.len() + block.len() + 16);
+    if ancestor.self_closing {
+        let start_tag = &raw[ancestor.start..ancestor.start_end];
+        let open = start_tag
+            .strip_suffix("/>")
+            .or_else(|| start_tag.strip_suffix('>'))
+            .unwrap_or(start_tag)
+            .trim_end();
+        output.push_str(&raw[..ancestor.start]);
+        output.push_str(open);
+        output.push_str(">\n");
+        output.push_str(&block);
+        output.push_str(&ancestor_indent);
+        output.push_str("</");
+        output.push_str(&ancestor.name);
+        output.push('>');
+        output.push_str(&raw[ancestor.end..]);
+        return Ok(output);
+    }
+
+    let inner = &raw[ancestor.start_end..ancestor.end_start];
+    let has_newline = inner.contains('\n');
+    let close_line = if has_newline {
+        raw[..ancestor.end_start]
+            .rfind('\n')
+            .map(|index| index + 1)
+            .unwrap_or(ancestor.end_start)
+    } else {
+        ancestor.end_start
+    };
+    output.push_str(&raw[..close_line]);
+    if !has_newline {
+        output.push('\n');
+    }
+    output.push_str(&block);
+    output.push_str(&raw[close_line..]);
+    Ok(output)
+}
+
+fn validate_xml(raw: &str) -> Result<(), String> {
+    let mut reader = Reader::from_str(raw);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Eof) => return Ok(()),
+            Ok(_) => {}
+            Err(err) => return Err(crate::trf!("failed_to_parse_rc_xml", err)),
+        }
+    }
+}
+
+fn line_indent(raw: &str, position: usize) -> String {
+    let line_start = raw[..position]
+        .rfind('\n')
+        .map(|index| index + 1)
+        .unwrap_or(0);
+    raw[line_start..position]
+        .chars()
+        .take_while(|character| *character == ' ' || *character == '\t')
+        .collect()
+}
+
+fn indent_unit(raw: &str) -> String {
+    if raw.lines().any(|line| line.starts_with('\t')) {
+        return "\t".to_string();
+    }
+    let smallest = raw
+        .lines()
+        .filter(|line| line.trim_start().starts_with('<'))
+        .map(|line| line.len() - line.trim_start().len())
+        .filter(|indent| *indent > 0)
+        .min()
+        .unwrap_or(2);
+    " ".repeat(smallest.max(1))
+}
+
 pub fn parse_attrs(input: &str) -> Result<Vec<(String, String)>, String> {
     let mut rest = input.trim();
     let mut attrs: Vec<(String, String)> = Vec::new();
@@ -961,5 +1305,139 @@ mod tests {
         let removed = patch(&raw, &[], &["A-F2".to_string()]).unwrap();
         let after_remove = parse(&removed).unwrap();
         assert_eq!(after_remove.len(), before.len() - 1);
+    }
+
+    #[test]
+    fn reads_scalar_values_case_insensitively() {
+        assert_eq!(
+            get(RC, "/labwc_config/core/decoration").as_deref(),
+            Some("server")
+        );
+        assert_eq!(
+            get(RC, "/LABWC_CONFIG/Core/Decoration").as_deref(),
+            Some("server")
+        );
+        assert_eq!(get(RC, "/labwc_config/theme/name"), None);
+    }
+
+    #[test]
+    fn sets_existing_scalar_and_preserves_siblings() {
+        let updated = set(RC, "/labwc_config/core/decoration", "client").unwrap();
+        assert!(updated.contains("<decoration>client</decoration>"));
+        assert!(updated.contains("<keybind key=\"W-p\">"));
+        assert_eq!(
+            get(&updated, "/labwc_config/core/decoration").as_deref(),
+            Some("client")
+        );
+    }
+
+    #[test]
+    fn creates_missing_scalar_chain() {
+        let updated = set(RC, "/labwc_config/theme/cornerRadius", "12").unwrap();
+        assert!(updated.contains("<theme>"));
+        assert!(updated.contains("<cornerRadius>12</cornerRadius>"));
+        assert_eq!(
+            get(&updated, "/labwc_config/theme/cornerRadius").as_deref(),
+            Some("12")
+        );
+        validate_xml(&updated).unwrap();
+    }
+
+    #[test]
+    fn expands_self_closing_parent() {
+        let raw = r#"<labwc_config>
+  <core />
+</labwc_config>
+"#;
+        let updated = set(raw, "/labwc_config/core/gap", "6").unwrap();
+        assert!(updated.contains("<core>"));
+        assert!(updated.contains("<gap>6</gap>"));
+        assert!(updated.contains("</core>"));
+        validate_xml(&updated).unwrap();
+    }
+
+    #[test]
+    fn inserts_into_compact_xml() {
+        let raw = r#"<labwc_config><core></core></labwc_config>"#;
+        let updated = set(raw, "/labwc_config/core/gap", "6").unwrap();
+        assert_eq!(
+            get(&updated, "/labwc_config/core/gap").as_deref(),
+            Some("6")
+        );
+        validate_xml(&updated).unwrap();
+    }
+
+    #[test]
+    fn creates_skeleton_when_empty() {
+        let updated = set("", "/labwc_config/theme/name", "Adwaita").unwrap();
+        assert!(updated.contains("<labwc_config>"));
+        assert_eq!(
+            get(&updated, "/labwc_config/theme/name").as_deref(),
+            Some("Adwaita")
+        );
+    }
+
+    #[test]
+    fn removes_scalar_node() {
+        let updated = remove(RC, "/labwc_config/core/decoration").unwrap();
+        assert_eq!(get(&updated, "/labwc_config/core/decoration"), None);
+        assert!(updated.contains("<core>"));
+        validate_xml(&updated).unwrap();
+    }
+
+    #[test]
+    fn real_config_scalar_patch_when_requested() {
+        let Ok(path) = std::env::var("LXWC_TEST_RC") else {
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(path) else {
+            return;
+        };
+        let changes = [
+            ("/labwc_config/theme/cornerRadius", "10"),
+            ("/labwc_config/theme/dropShadows", "yes"),
+            ("/labwc_config/focus/followMouse", "yes"),
+            ("/labwc_config/focus/raiseOnFocusDelay", "120"),
+            ("/labwc_config/snapping/overlay/enabled", "yes"),
+            ("/labwc_config/resize/drawContents", "yes"),
+            ("/labwc_config/magnifier/initScale", "1.5"),
+            ("/labwc_config/libinput/device/naturalScroll", "no"),
+        ];
+        let mut updated = raw;
+        for (path, value) in changes {
+            updated = set(&updated, path, value).unwrap();
+        }
+        validate_xml(&updated).unwrap();
+        parse(&updated).unwrap();
+    }
+
+    #[test]
+    fn scalar_edits_and_keybind_patch_compose() {
+        let updated = set(RC, "/labwc_config/theme/cornerRadius", "12").unwrap();
+        let updated = set(&updated, "/labwc_config/focus/followMouse", "yes").unwrap();
+        let updated = patch(
+            &updated,
+            &[Addition {
+                key: "W-t".to_string(),
+                attrs: Vec::new(),
+                actions: vec![action("Execute", "qterminal")],
+            }],
+            &[],
+        )
+        .unwrap();
+
+        assert_eq!(
+            get(&updated, "/labwc_config/theme/cornerRadius").as_deref(),
+            Some("12")
+        );
+        assert_eq!(
+            get(&updated, "/labwc_config/focus/followMouse").as_deref(),
+            Some("yes")
+        );
+        assert!(parse(&updated)
+            .unwrap()
+            .iter()
+            .any(|entry| entry.key == "W-t"));
+        validate_xml(&updated).unwrap();
     }
 }

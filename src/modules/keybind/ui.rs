@@ -267,7 +267,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
             module.discard_edit(&edit);
         }
 
-        if let Some(err) = ctx.failures.get("keybind") {
+        if let Some(err) = ctx.failures.get(crate::modules::RC_XML_TASK_ID) {
             ui.colored_label(theme::DANGER, RichText::new(err).small());
         }
 
