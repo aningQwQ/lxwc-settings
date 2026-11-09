@@ -527,11 +527,16 @@ fn compose_combo(parts: ComboParts, base: Option<&str>) -> String {
         (parts.shift, 'S'),
     ] {
         if enabled {
+            if !out.is_empty() {
+                out.push('-');
+            }
             out.push(label);
-            out.push('-');
         }
     }
     if let Some(base) = base {
+        if !out.is_empty() {
+            out.push('-');
+        }
         out.push_str(base);
     }
     out
@@ -549,9 +554,13 @@ fn toggle_modifier(input: &str, which: char) -> String {
     compose_combo(parts, base.as_deref())
 }
 
-fn set_base_key(input: &str, base: &str) -> String {
-    let (parts, _) = parse_parts(input);
-    compose_combo(parts, Some(base))
+fn toggle_base_key(input: &str, base: &str) -> String {
+    let (parts, current) = parse_parts(input);
+    if current.as_deref() == Some(base) {
+        compose_combo(parts, None)
+    } else {
+        compose_combo(parts, Some(base))
+    }
 }
 
 fn soft_keyboard(module: &mut KeybindModule, ui: &mut egui::Ui) {
@@ -600,7 +609,7 @@ fn soft_keyboard(module: &mut KeybindModule, ui: &mut egui::Ui) {
         for (label, value) in keys {
             let selected = base.as_deref() == Some(value);
             if key_button(ui, &label, value, selected) {
-                key_value = set_base_key(&key_value, value);
+                key_value = toggle_base_key(&key_value, value);
                 changed = true;
             }
         }
@@ -798,16 +807,22 @@ mod tests {
     fn toggles_modifiers_and_keeps_base() {
         assert_eq!(toggle_modifier("W-t", 'C'), "W-C-t");
         assert_eq!(toggle_modifier("W-C-t", 'C'), "W-t");
-        assert_eq!(toggle_modifier("", 'W'), "W-");
-        assert_eq!(toggle_modifier("W-", 'W'), "");
+        assert_eq!(toggle_modifier("", 'W'), "W");
+        assert_eq!(toggle_modifier("W", 'W'), "");
+        assert_eq!(toggle_modifier("W", 'C'), "W-C");
+        assert_eq!(toggle_modifier("W-C", 'A'), "W-C-A");
+        assert_eq!(toggle_modifier("W-C", 'C'), "W");
     }
 
     #[test]
     fn picks_base_and_keeps_modifiers() {
-        assert_eq!(set_base_key("W-C-", "p"), "W-C-p");
-        assert_eq!(set_base_key("W-C-t", "Return"), "W-C-Return");
-        assert_eq!(set_base_key("", "Print"), "Print");
-        assert_eq!(set_base_key("W-x-y", "p"), "W-p");
+        assert_eq!(toggle_base_key("W-C", "p"), "W-C-p");
+        assert_eq!(toggle_base_key("W-C-t", "Return"), "W-C-Return");
+        assert_eq!(toggle_base_key("", "Print"), "Print");
+        assert_eq!(toggle_base_key("W-x-y", "p"), "W-p");
+        assert_eq!(toggle_base_key("W-t", "t"), "W");
+        assert_eq!(toggle_base_key("W", "t"), "W-t");
+        assert_eq!(toggle_base_key("W-t", "p"), "W-p");
     }
 
     #[test]

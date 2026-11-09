@@ -180,7 +180,7 @@ impl KeybindModule {
             }]
         };
 
-        let keybind_attrs = form
+        let mut keybind_attrs = form
             .editing_original
             .as_ref()
             .and_then(|original| {
@@ -191,6 +191,13 @@ impl KeybindModule {
                     .map(|entry| entry.attrs.clone())
             })
             .unwrap_or_default();
+        if rc_xml::is_standalone_modifier_key(&key)
+            && !keybind_attrs
+                .iter()
+                .any(|(name, _)| name.eq_ignore_ascii_case("onRelease"))
+        {
+            keybind_attrs.push(("onRelease".to_string(), "yes".to_string()));
+        }
 
         let edit = KeybindEdit {
             original_key: form.editing_original.clone(),
@@ -533,6 +540,22 @@ mod tests {
         let raw = module.raw.clone();
         assert!(module.rc_xml_patch(&raw).unwrap().is_none());
 
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn standalone_modifier_uses_keysym_and_on_release() {
+        let (dir, path) = temp_rc();
+        let mut module = KeybindModule::with_path(path);
+        module.form.key = "W".to_string();
+        module.form.action = "Close".to_string();
+        module.submit().unwrap();
+        assert_eq!(module.edits.len(), 1);
+        assert_eq!(module.edits[0].key, "Super_L");
+        assert!(module.edits[0]
+            .attrs
+            .iter()
+            .any(|(name, value)| name == "onRelease" && value == "yes"));
         std::fs::remove_dir_all(dir).ok();
     }
 

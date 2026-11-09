@@ -112,6 +112,19 @@ pub fn validate_combo(input: &str) -> Result<String, String> {
         }
     }
 
+    if bases.is_empty() {
+        let standalone = match (sup, ctrl, alt, shift) {
+            (true, false, false, false) => Some("Super_L"),
+            (false, true, false, false) => Some("Control_L"),
+            (false, false, true, false) => Some("Alt_L"),
+            (false, false, false, true) => Some("Shift_L"),
+            _ => None,
+        };
+        if let Some(base) = standalone {
+            return Ok(base.to_string());
+        }
+    }
+
     if bases.len() != 1 {
         return Err(crate::i18n::t(
             "exactly_one_main_key_is_required_use_uppercase_w_c_a_s_for_modifiers",
@@ -139,6 +152,10 @@ pub fn validate_combo(input: &str) -> Result<String, String> {
     }
     out.push_str(base);
     Ok(out)
+}
+
+pub fn is_standalone_modifier_key(key: &str) -> bool {
+    matches!(key, "Super_L" | "Control_L" | "Alt_L" | "Shift_L")
 }
 
 pub fn validate_action_name(name: &str) -> Result<(), String> {
@@ -1216,10 +1233,17 @@ mod tests {
         assert_eq!(validate_combo("W-C-A-S-t").unwrap(), "W-C-A-S-t");
         assert_eq!(validate_combo("Print").unwrap(), "Print");
         assert_eq!(validate_combo("W-Return").unwrap(), "W-Return");
+        assert_eq!(validate_combo("W").unwrap(), "Super_L");
+        assert_eq!(validate_combo("C").unwrap(), "Control_L");
+        assert_eq!(validate_combo("A").unwrap(), "Alt_L");
+        assert_eq!(validate_combo("S").unwrap(), "Shift_L");
+        assert!(validate_combo("W-C").is_err());
         assert!(validate_combo("W-C-t-X").is_err());
         assert!(validate_combo("W-").is_err());
         assert!(validate_combo("W-Left-x").is_err());
         assert!(validate_combo("W-C-").is_err());
+        assert!(is_standalone_modifier_key("Super_L"));
+        assert!(!is_standalone_modifier_key("W-t"));
     }
 
     #[test]
