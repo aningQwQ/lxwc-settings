@@ -1,0 +1,220 @@
+# English translations for LXWC Settings.
+# Format: <key><TAB><text>
+# Lines starting with # are comments. Keep the {} placeholders.
+
+about_to_apply_changes	About to apply {} changes:
+action_command	Action / Command
+action_mode	Action mode
+action_name	Action name
+action_name_cannot_be_empty	Action name cannot be empty
+action_name_may_only_contain_letters_digits_and_underscores	Action name may only contain letters, digits and underscores
+action_xml_multiple_actions_allowed	Action XML (multiple actions allowed)
+actions	{} ({} actions)
+actions_2	Actions
+add_to_queue	Add to queue
+add_update_queue	Add / update queue
+advanced_xml	Advanced XML
+apply	Apply
+apply_2	Apply ({})
+apply_now_auto_rollback_in_15_s	Apply now (auto-rollback in 15 s)
+apply_report	Apply report
+applying	Applying…
+applying_changes	Applying changes…
+at_least_one_action_is_required	At least one <action> is required
+attribute_has_an_unclosed_quote	Attribute {} has an unclosed quote
+attribute_is_duplicated	Attribute {} is duplicated
+attribute_is_missing	Attribute {} is missing '='
+attributes_must_use_key_value	Attributes must use key=value
+available_modes	{} available modes
+avoid_black_screens_or_corruption_with_some_streaming_and_virtual_outputs_caused_by_gpu_modifiers	Avoid black screens or corruption with some streaming and virtual outputs caused by GPU modifiers.
+batt	Batt
+bri	Bri+
+bri_2	Bri-
+calc	Calc
+cancel	Cancel
+cancel_editing	Cancel editing
+clear	Clear
+clear_form	Clear form
+click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym	Click modifiers and a key to build the combination; the field above still accepts any keysym.
+close	Close
+command	Command
+common	Common
+common_actions	Common actions…
+configuration_reloaded	Configuration reloaded
+confirm_apply	Confirm apply
+confirm_display_mode	Confirm display mode
+current	 (current)
+current_file	Current file: {}
+current_mode	Current mode: {}
+delete	Delete
+delete_from_the_environment_file	Delete {} from the environment file
+delete_shortcut	Delete shortcut {}
+digits	Digits
+disable_hardware_cursors	Disable hardware cursors
+disabled	{} (disabled)
+disabled_2	Disabled
+disp	Disp
+display_output	Display & Output
+display_scan_failed	Display scan failed: {}
+does_not_exist_and_will_be_created_when_applying	{} does not exist and will be created when applying.
+done_succeeded	Done: {} succeeded
+e_g_direction_left_combine_yes	e.g. direction="left" combine="yes"
+e_g_w_c_s_t_w_return_print_xf86audiomute	e.g. W-C-S-t, W-Return, Print, XF86AudioMute
+edit	Edit
+edit_add	Edit / Add
+edit_labwc_environment_for_streaming_and_compatibility_switches	Edit labwc environment for streaming and compatibility switches.
+editing_other_keybind_attributes_are_preserved	Editing: {} (other keybind attributes are preserved)
+enabled	Enabled
+enter_a_key_combination_e_g_w_c_s_t	Enter a key combination, e.g. W-C-S-t
+enter_name_command_in_their_dedicated_fields	Enter name / command in their dedicated fields
+environment_system	Environment / System
+environment_tweaks	Environment Tweaks
+exactly_one_main_key_is_required_use_uppercase_w_c_a_s_for_modifiers	Exactly one main key is required; use uppercase W / C / A / S for modifiers
+existing_shortcuts	Existing shortcuts ({})
+extra_attributes	Extra attributes
+f_keys	F keys
+failed	Failed
+failed_2	{} failed
+failed_3	Failed: {}
+failed_kept_in_queue	, {} failed (kept in queue)
+failed_to_back_up	Failed to back up {}: {}
+failed_to_create_directory	Failed to create directory {}: {}
+failed_to_invoke_pkill	Failed to invoke pkill: {}
+failed_to_parse_action_xml	Failed to parse action XML: {}
+failed_to_parse_rc_xml	Failed to parse rc.xml: {}
+failed_to_read	Failed to read {}: {}
+failed_to_read_configuration	Failed to read configuration: {}
+failed_to_reload_configuration	; failed to reload configuration: {}
+failed_to_replace	Failed to replace {}: {}
+failed_to_run_wlr_randr	Failed to run wlr-randr: {}
+failed_to_switch_mode	Failed to switch mode: {}
+failed_to_write_temporary_file	Failed to write temporary file {}: {}
+files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry	Files are backed up as *.lxwc.bak before writing. Failed tasks stay queued for retry.
+force_linear_buffers	Force linear buffers
+from	From {}
+home	Home
+invalid_attribute_name	Invalid attribute name: {}
+keep_this_mode	Keep this mode
+key	Key
+key_2	Key
+key_bindings	Key Bindings
+key_combination	Key combination
+labwc_lxqt_control_center	Labwc × LXQt Control Center
+labwc_reload_failed	labwc reload failed
+labwc_reload_failed_2	; labwc reload failed: {}
+language	Language
+letters	Letters
+lxqt_module	LXQt Module
+lxwc_settings	LXWC Settings
+lxwc_settings_2	LXWC Settings
+mail	Mail
+manage_outputs_directly_via_wlr_randr_with_a_15_second_rollback_watchdog	Manage outputs directly via wlr-randr, with a 15-second rollback watchdog.
+media	Media
+menu	Menu
+mode_switched_but_the_previous_mode_is_unavailable_auto_rollback_is_disabled	Mode switched, but the previous mode is unavailable; auto-rollback is disabled
+mute	Mute
+navigation	Navigation
+new	New
+new_display_mode_kept	New display mode kept
+next	Next
+no_action	No action
+no_change	No change
+no_change_from_the_current_state_not_queued	No change from the current state; not queued
+no_key_bindings_found	No key bindings found.
+no_keyboard_node_found_in_rc_xml	No </keyboard> node found in rc.xml
+no_matching_key_bindings	No matching key bindings.
+no_outputs_detected	No outputs detected.
+not_set	Not set
+note_this_binding_contains_multiple_actions_submitting_in_common_mode_keeps_only_the_first_one_use_advanced_xml_instead	Note: this binding contains multiple actions. Submitting in Common mode keeps only the first one; use Advanced XML instead.
+only_action_elements_are_allowed_extra_keybind_keyboard_elements_are_not	Only action elements are allowed; extra keybind/keyboard elements are not
+output	Output
+overwrite	Overwrite
+overwrite_the_existing_binding_for_this_key_in_rc_xml	Overwrite the existing binding for this key in rc.xml
+pending	{} pending
+pending_delete	Pending delete
+pending_shortcuts	Pending shortcuts
+pending_update	Pending update
+pkill_hup_labwc_failed	pkill -HUP labwc failed: {}
+play	Play
+power	Power
+prev	Prev
+print	Print
+queued	Queued: {} → {}
+queued_for_deletion	Queued for deletion: {}
+rc_xml_is_empty_cannot_write_key_bindings	rc.xml is empty; cannot write key bindings
+ready	Ready
+rec	Rec
+regenerate_from_common_fields	Regenerate from common fields
+reloading_configuration	Reloading configuration…
+remove	Remove
+remove_environment_variable	Remove environment variable {}
+rename	Rename
+report	Report
+required_for_execute_e_g_lxqt_qdbus_run_qterminal	Required for Execute, e.g. lxqt-qdbus run qterminal
+rescan	Rescan
+rescan_displays	Rescan displays
+rescanning	Rescanning…
+reset_queue_and_restore_defaults	Reset queue and restore defaults
+resolution_refresh_rate	Resolution / Refresh rate
+restore_current_mode	Restore current mode
+restore_failed	Restore failed: {}
+restored_to_its_previous_mode	{} restored to its previous mode
+restoring	Restoring {}…
+roll_back_now	Roll back now
+s	{} s
+scan_failed	Scan failed: {}
+scanning	Scanning…
+search	Search
+search_key_action_command	Search key / action / command
+seconds_until_auto_revert_to	{} seconds until auto-revert to {}.
+select_mode	Select mode
+select_output	Select output
+set	Set {}={}
+shortcut	Shortcut {} → {}
+shortcut_has_no_action	Shortcut {} has no action
+showing_drag_header_dividers_to_resize_click_edit_to_load	Showing {} / {} · Drag header dividers to resize · Click Edit to load
+sleep	Sleep
+soft_keyboard	Soft keyboard
+status	Status
+success	Success
+susp	Susp
+switch_output_modes_directly_via_wlr_randr_a_15_second_confirmation_window_appears_after_applying_otherwise_it_rolls_back_automatically	Switch output modes directly via wlr-randr. A 15-second confirmation window appears after applying; otherwise it rolls back automatically.
+switched_to	{} switched to {}
+switched_to_confirm_within_seconds_or_it_will_roll_back	Switched to {}. Confirm within {} seconds or it will roll back
+switching	Switching…
+switching_to	Switching to {}…
+symbols	Symbols
+takes_effect_after_re_login	{}: {} (takes effect after re-login)
+the_combination_contains_an_empty_segment	The combination contains an empty segment
+the_current_mode_could_not_be_read_so_auto_rollback_is_disabled	The current mode could not be read, so auto-rollback is disabled.
+the_execute_action_requires_a_command	The Execute action requires a command
+the_key_combination_cannot_contain_spaces	The key combination cannot contain spaces
+the_main_key_must_be_an_xkb_keysym_name_letters_digits_underscores	The main key must be an XKB keysym name (letters, digits, underscores)
+the_output_is_disabled_refusing_to_switch	The output is disabled; refusing to switch
+the_output_is_disabled_switching_is_blocked_to_keep_rollback_possible	The output is disabled; switching is blocked to keep rollback possible.
+the_patched_rc_xml_could_not_be_parsed_changes_were_cancelled	The patched rc.xml could not be parsed; changes were cancelled: {}
+the_queue_is_empty_fill_in_a_key_combination_and_action_or_edit_delete_from_the_existing_shortcuts_tab	The queue is empty. Fill in a key combination and action, or edit/delete from the Existing shortcuts tab.
+the_target_key_conflicts_with_another_queued_change	The target key conflicts with another queued change
+these_switches_are_written_to_config_labwc_environment_and_only_take_effect_the_next_time_the_labwc_session_starts	These switches are written to ~/.config/labwc/environment and only take effect the next time the labwc session starts.
+these_variables_are_not_hot_reloaded_log_out_and_back_in_to_verify_the_effect	These variables are not hot-reloaded. Log out and back in to verify the effect.
+took_ms	Took {} ms
+touch	Touch
+type_a_labwc_keysym_combination_and_action_or_load_one_from_the_existing_shortcuts_tab	Type a labwc keysym combination and action, or load one from the Existing shortcuts tab.
+type_any_keysym_combination_and_action_and_edit_rc_xml_keybindings_directly	Type any keysym combination and action, and edit rc.xml keybindings directly.
+undo	Undo
+undo_delete	Undo delete
+unknown	Unknown
+update	Update
+use_a_software_cursor_to_fix_disappearing_or_ghosting_cursors_during_remote_streaming	Use a software cursor to fix disappearing or ghosting cursors during remote streaming.
+use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_return_space_left_print_f12_xf86audiomute_labwc_does_not_support_multi_step_key_sequences	Use W / C / A / S for modifiers and an XKB keysym name for the key. Common keysyms: Return, space, Left, Print, F12, XF86AudioMute. labwc does not support multi-step key sequences.
+vol	Vol+
+vol_2	Vol-
+waiting_for_confirmation	Waiting for confirmation…
+was_not_found_key_bindings_cannot_be_written	{} was not found; key bindings cannot be written.
+wifi	WiFi
+wlr_module	WLR Module
+wlr_randr_failed	wlr-randr failed: {}
+wlr_randr_failed_to_switch_modes	wlr-randr failed to switch modes: {}
+write_a_new_key_binding	Write a new key binding
+written	Written: {}
+xml_preview	XML preview

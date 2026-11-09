@@ -15,14 +15,8 @@ pub enum WorkerRequest {
     Refresh,
     ScanOutputs,
     ApplyTasks(Vec<Task>),
-    ApplyMode {
-        output: String,
-        spec: String,
-    },
-    RevertMode {
-        output: String,
-        spec: String,
-    },
+    ApplyMode { output: String, spec: String },
+    RevertMode { output: String, spec: String },
 }
 
 pub enum WorkerEvent {
@@ -153,7 +147,7 @@ fn apply_tasks(tasks: &[Task]) -> ApplyReport {
         let path = config::rc_path();
         let outcome = (|| -> Result<(), String> {
             let raw = std::fs::read_to_string(&path)
-                .map_err(|err| crate::trf!("读取 {} 失败：{err}", "Failed to read {}: {err}", path.display()))?;
+                .map_err(|err| crate::trf!("failed_to_read", path.display(), err))?;
             let mut additions = Vec::new();
             let mut remove_keys: Vec<String> = Vec::new();
 
@@ -211,10 +205,7 @@ fn result_for(task: &Task, outcome: &Result<(), String>) -> TaskResult {
 }
 
 fn reconfigure_labwc() -> Result<(), String> {
-    if let Ok(output) = ProcessCommand::new("labwc")
-        .arg("--reconfigure")
-        .output()
-    {
+    if let Ok(output) = ProcessCommand::new("labwc").arg("--reconfigure").output() {
         if output.status.success() {
             return Ok(());
         }
@@ -223,13 +214,12 @@ fn reconfigure_labwc() -> Result<(), String> {
     let output = ProcessCommand::new("pkill")
         .args(["-HUP", "-x", "labwc"])
         .output()
-        .map_err(|err| crate::trf!("无法调用 pkill：{err}", "Failed to invoke pkill: {err}"))?;
+        .map_err(|err| crate::trf!("failed_to_invoke_pkill", err))?;
     if output.status.success() {
         Ok(())
     } else {
         Err(crate::trf!(
-            "pkill -HUP labwc 失败：{}",
-            "pkill -HUP labwc failed: {}",
+            "pkill_hup_labwc_failed",
             String::from_utf8_lossy(&output.stderr).trim()
         ))
     }
@@ -239,7 +229,7 @@ fn run_wlr_randr(output: &str, spec: &str) -> Result<(), String> {
     let result = ProcessCommand::new("wlr-randr")
         .args(["--output", output, "--mode", spec])
         .output()
-        .map_err(|err| crate::trf!("无法执行 wlr-randr：{err}", "Failed to run wlr-randr: {err}"))?;
+        .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
 
     if result.status.success() {
         return Ok(());
@@ -252,8 +242,5 @@ fn run_wlr_randr(output: &str, spec: &str) -> Result<(), String> {
     } else {
         stderr.trim()
     };
-    Err(crate::trf!(
-        "wlr-randr 切换模式失败：{detail}",
-        "wlr-randr failed to switch modes: {detail}"
-    ))
+    Err(crate::trf!("wlr_randr_failed_to_switch_modes", detail))
 }

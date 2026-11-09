@@ -203,13 +203,10 @@ impl App {
                 WorkerEvent::ModeReverted { output, result } => {
                     self.status = Some(match result {
                         Ok(()) => StatusMessage::info(crate::trf!(
-                            "{output} 已还原到之前的模式",
-                            "{output} restored to its previous mode",
+                            "restored_to_its_previous_mode",
+                            output
                         )),
-                        Err(err) => StatusMessage::error(crate::trf!(
-                            "还原失败：{err}",
-                            "Restore failed: {err}",
-                        )),
+                        Err(err) => StatusMessage::error(crate::trf!("restore_failed", err)),
                     });
                     self.worker.send(WorkerRequest::ScanOutputs);
                 }
@@ -223,15 +220,12 @@ impl App {
                 let reset = self.reset_on_baseline || self.baseline.is_none();
                 self.reset_on_baseline = false;
                 self.adopt_baseline(baseline, reset);
-                self.status = Some(StatusMessage::info(t(
-                    "配置已重新载入",
-                    "Configuration reloaded",
-                )));
+                self.status = Some(StatusMessage::info(t("configuration_reloaded")));
             }
             Err(err) => {
                 self.status = Some(StatusMessage::error(crate::trf!(
-                    "读取配置失败：{err}",
-                    "Failed to read configuration: {err}",
+                    "failed_to_read_configuration",
+                    err
                 )));
             }
         }
@@ -266,8 +260,8 @@ impl App {
             Err(err) => {
                 self.outputs_error = Some(err.clone());
                 self.status = Some(StatusMessage::error(crate::trf!(
-                    "扫描显示器失败：{err}",
-                    "Display scan failed: {err}",
+                    "display_scan_failed",
+                    err
                 )));
             }
         }
@@ -307,27 +301,15 @@ impl App {
 
         let success = report.success_count();
         let failure = report.failure_count();
-        let mut text = crate::trf!(
-            "执行完成：成功 {success} 项",
-            "Done: {success} succeeded",
-        );
+        let mut text = crate::trf!("done_succeeded", success);
         if failure > 0 {
-            text.push_str(&crate::trf!(
-                "，失败 {failure} 项（已保留在队列）",
-                ", {failure} failed (kept in queue)",
-            ));
+            text.push_str(&crate::trf!("failed_kept_in_queue", failure));
         }
         if let Some(err) = &report.reconfigure_error {
-            text.push_str(&crate::trf!(
-                "；labwc 重载失败：{err}",
-                "; labwc reload failed: {err}",
-            ));
+            text.push_str(&crate::trf!("labwc_reload_failed_2", err));
         }
         if let Some(err) = &reload_error {
-            text.push_str(&crate::trf!(
-                "；重读配置失败：{err}",
-                "; failed to reload configuration: {err}",
-            ));
+            text.push_str(&crate::trf!("failed_to_reload_configuration", err));
         }
         self.status = Some(StatusMessage {
             text,
@@ -354,25 +336,21 @@ impl App {
                             deadline: Instant::now() + Duration::from_secs(WATCHDOG_SECONDS),
                         });
                         self.status = Some(StatusMessage::info(crate::trf!(
-                            "已切换到 {}，{} 秒内确认否则自动回滚",
-                            "Switched to {}. Confirm within {} seconds or it will roll back",
+                            "switched_to_confirm_within_seconds_or_it_will_roll_back",
                             mode.label(),
                             WATCHDOG_SECONDS
                         )));
                     }
                     _ => {
-                        self.status = Some(StatusMessage::error(t(
-                            "已切换模式，但无法获取原模式，自动回滚未启用",
-                            "Mode switched, but the previous mode is unavailable; auto-rollback is disabled",
-                        )));
+                        self.status = Some(StatusMessage::error(t("mode_switched_but_the_previous_mode_is_unavailable_auto_rollback_is_disabled")));
                     }
                 }
                 self.worker.send(WorkerRequest::ScanOutputs);
             }
             Err(err) => {
                 self.status = Some(StatusMessage::error(crate::trf!(
-                    "切换失败：{err}",
-                    "Failed to switch mode: {err}",
+                    "failed_to_switch_mode",
+                    err
                 )));
                 self.worker.send(WorkerRequest::ScanOutputs);
             }
@@ -430,13 +408,8 @@ impl App {
                 Some(value) => tasks.push(Task {
                     id: format!("env:{}={}", item.key, value),
                     module: ModuleKind::Environment,
-                    title: crate::trf!("设置 {}={}", "Set {}={}", item.key, value),
-                    detail: crate::trf!(
-                        "{}：{}（重新登录后生效）",
-                        "{}: {} (takes effect after re-login)",
-                        item.label(),
-                        item.help(),
-                    ),
+                    title: crate::trf!("set", item.key, value),
+                    detail: crate::trf!("takes_effect_after_re_login", item.label(), item.help()),
                     action: TaskAction::EnvSet {
                         key: item.key.to_string(),
                         value,
@@ -445,12 +418,8 @@ impl App {
                 None => tasks.push(Task {
                     id: format!("env:{}", item.key),
                     module: ModuleKind::Environment,
-                    title: crate::trf!("移除环境变量 {}", "Remove environment variable {}", item.key),
-                    detail: crate::trf!(
-                        "从 environment 文件中删除 {}",
-                        "Delete {} from the environment file",
-                        item.key,
-                    ),
+                    title: crate::trf!("remove_environment_variable", item.key),
+                    detail: crate::trf!("delete_from_the_environment_file", item.key),
                     action: TaskAction::EnvUnset {
                         key: item.key.to_string(),
                     },
@@ -470,7 +439,7 @@ impl App {
             tasks.push(Task {
                 id: keybind_remove_id(&entry.key),
                 module: ModuleKind::Keybind,
-                title: crate::trf!("删除快捷键 {}", "Delete shortcut {}", entry.key),
+                title: crate::trf!("delete_shortcut", entry.key),
                 detail: entry.summary(),
                 action: TaskAction::KeybindRemove {
                     key: entry.key.clone(),
@@ -502,7 +471,7 @@ impl App {
                         tasks.push(Task {
                             id: keybind_remove_id(&entry.key),
                             module: ModuleKind::Keybind,
-                            title: crate::trf!("删除快捷键 {}", "Delete shortcut {}", entry.key),
+                            title: crate::trf!("delete_shortcut", entry.key),
                             detail: entry.summary(),
                             action: TaskAction::KeybindRemove {
                                 key: entry.key.clone(),
@@ -520,20 +489,11 @@ impl App {
             tasks.push(Task {
                 id: keybind_add_id(edit),
                 module: ModuleKind::Keybind,
-                title: crate::trf!(
-                    "快捷键 {} → {}",
-                    "Shortcut {} → {}",
-                    edit.key,
-                    edit.summary(),
-                ),
+                title: crate::trf!("shortcut", edit.key, edit.summary()),
                 detail: if replace {
-                    t(
-                        "覆盖 rc.xml 中已有的同名按键",
-                        "Overwrite the existing binding for this key in rc.xml",
-                    )
-                    .to_string()
+                    t("overwrite_the_existing_binding_for_this_key_in_rc_xml").to_string()
                 } else {
-                    t("写入新的快捷键绑定", "Write a new key binding").to_string()
+                    t("write_a_new_key_binding").to_string()
                 },
                 action: TaskAction::KeybindAdd {
                     key: edit.key.clone(),
@@ -556,10 +516,7 @@ impl App {
         self.reset_modes_on_scan = true;
         self.scanning = true;
         self.reset_mode_selection();
-        self.status = Some(StatusMessage::info(t(
-            "正在重新读取配置…",
-            "Reloading configuration…",
-        )));
+        self.status = Some(StatusMessage::info(t("reloading_configuration")));
         self.worker.send(WorkerRequest::Refresh);
         self.worker.send(WorkerRequest::ScanOutputs);
     }
@@ -569,10 +526,7 @@ impl App {
         self.outputs_error = None;
         self.reset_modes_on_scan = true;
         self.reset_mode_selection();
-        self.status = Some(StatusMessage::info(t(
-            "正在重新扫描…",
-            "Rescanning…",
-        )));
+        self.status = Some(StatusMessage::info(t("rescanning")));
         self.worker.send(WorkerRequest::ScanOutputs);
     }
 
@@ -587,8 +541,9 @@ impl App {
             return;
         }
         self.applying = true;
-        self.status = Some(StatusMessage::info(t("正在执行队列…", "Applying changes…")));
-        self.worker.send(WorkerRequest::ApplyTasks(self.pending.clone()));
+        self.status = Some(StatusMessage::info(t("applying_changes")));
+        self.worker
+            .send(WorkerRequest::ApplyTasks(self.pending.clone()));
     }
 
     pub fn reset_keybind_form(&mut self) {
@@ -697,11 +652,8 @@ impl App {
             };
             let command = form.command.trim().to_string();
             if form.action.trim() == "Execute" && command.is_empty() {
-                self.keybind_form.error = Some(t(
-                    "Execute 动作必须填写命令",
-                    "The Execute action requires a command",
-                )
-                .to_string());
+                self.keybind_form.error =
+                    Some(t("the_execute_action_requires_a_command").to_string());
                 return;
             }
             vec![KeybindAction {
@@ -734,9 +686,9 @@ impl App {
         };
 
         let replace_index = edit.original_key.as_ref().and_then(|original| {
-            self.keybind_edits.iter().position(|existing| {
-                existing.original_key.as_deref() == Some(original.as_str())
-            })
+            self.keybind_edits
+                .iter()
+                .position(|existing| existing.original_key.as_deref() == Some(original.as_str()))
         });
 
         let target = keybinds::normalize_key(&edit.key);
@@ -745,17 +697,10 @@ impl App {
                 continue;
             }
             let other_target = keybinds::normalize_key(&other.key);
-            let other_original = other
-                .original_key
-                .as_deref()
-                .map(keybinds::normalize_key);
+            let other_original = other.original_key.as_deref().map(keybinds::normalize_key);
             if other_target == target || other_original.as_deref() == Some(target.as_str()) {
                 self.keybind_form.error =
-                    Some(t(
-                    "目标按键与队列中的另一项修改冲突",
-                    "The target key conflicts with another queued change",
-                )
-                .to_string());
+                    Some(t("the_target_key_conflicts_with_another_queued_change").to_string());
                 return;
             }
         }
@@ -764,10 +709,7 @@ impl App {
             self.keybind_edits.remove(index);
         }
 
-        let original_norm = edit
-            .original_key
-            .as_deref()
-            .map(keybinds::normalize_key);
+        let original_norm = edit.original_key.as_deref().map(keybinds::normalize_key);
         self.keybind_deletions.retain(|key| {
             let normalized = keybinds::normalize_key(key);
             normalized != target && Some(normalized) != original_norm
@@ -776,13 +718,11 @@ impl App {
         let status = self.edit_status(&edit);
         if status == EditStatus::NoChange {
             self.status = Some(StatusMessage::info(t(
-                "与现状一致，未加入队列",
-                "No change from the current state; not queued",
+                "no_change_from_the_current_state_not_queued",
             )));
         } else {
             self.status = Some(StatusMessage::info(crate::trf!(
-                "已加入队列：{} → {}",
-                "Queued: {} → {}",
+                "queued",
                 edit.key,
                 edit.summary()
             )));
@@ -812,9 +752,7 @@ impl App {
                 .find(|entry| keybinds::normalize_key(&entry.key) == original_norm);
             if original_norm == target {
                 match original_entry {
-                    Some(entry)
-                        if entry.actions == edit.actions && entry.attrs == edit.attrs =>
-                    {
+                    Some(entry) if entry.actions == edit.actions && entry.attrs == edit.attrs => {
                         EditStatus::NoChange
                     }
                     Some(_) => EditStatus::Update,
@@ -845,10 +783,7 @@ impl App {
         let normalized = keybinds::normalize_key(key);
         self.keybind_edits.retain(|edit| {
             let target = keybinds::normalize_key(&edit.key);
-            let original = edit
-                .original_key
-                .as_deref()
-                .map(keybinds::normalize_key);
+            let original = edit.original_key.as_deref().map(keybinds::normalize_key);
             target != normalized && original.as_deref() != Some(normalized.as_str())
         });
         self.keybind_deletions
@@ -872,10 +807,7 @@ impl App {
                 self.keybind_deletions.push(entry.key.clone());
             }
         }
-        self.status = Some(StatusMessage::info(crate::trf!(
-            "已加入删除队列：{key}",
-            "Queued for deletion: {key}",
-        )));
+        self.status = Some(StatusMessage::info(crate::trf!("queued_for_deletion", key)));
     }
 
     pub fn undo_delete_keybind(&mut self, key: &str) {
@@ -935,8 +867,7 @@ impl App {
         };
         if !output.enabled || output.current.is_none() {
             self.status = Some(StatusMessage::error(t(
-                "输出未启用，无法安全切换",
-                "The output is disabled; refusing to switch",
+                "the_output_is_disabled_refusing_to_switch",
             )));
             return;
         }
@@ -953,9 +884,8 @@ impl App {
             previous: output.current.clone(),
         });
         self.status = Some(StatusMessage::info(crate::trf!(
-            "正在切换到 {}…",
-            "Switching to {}…",
-            mode.label(),
+            "switching_to",
+            mode.label()
         )));
         self.worker.send(WorkerRequest::ApplyMode {
             output: output.name,
@@ -970,8 +900,7 @@ impl App {
                 spec: watchdog.previous.spec(),
             });
             self.status = Some(StatusMessage::info(crate::trf!(
-                "正在还原 {} …",
-                "Restoring {}…",
+                "restoring",
                 watchdog.output
             )));
         }
@@ -998,17 +927,13 @@ impl App {
         let mut cancel = false;
         let mut go = false;
 
-        egui::Window::new(t("确认执行", "Confirm apply"))
+        egui::Window::new(t("confirm_apply"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.set_min_width(520.0);
-                ui.label(crate::trf!(
-                    "即将执行 {} 项变更：",
-                    "About to apply {} changes:",
-                    tasks.len(),
-                ));
+                ui.label(crate::trf!("about_to_apply_changes", tasks.len()));
                 ui.add_space(4.0);
                 egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
                     for (index, task) in tasks.iter().enumerate() {
@@ -1022,19 +947,16 @@ impl App {
                 });
                 ui.separator();
                 ui.label(
-                    egui::RichText::new(t(
-                        "写入前会备份为 *.lxwc.bak；失败的任务会留在队列中等待重试。",
-                        "Files are backed up as *.lxwc.bak before writing. Failed tasks stay queued for retry.",
-                    ))
+                    egui::RichText::new(t("files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry"))
                     .small()
                     .weak(),
                 );
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    if ui.button(t("执行", "Apply")).clicked() {
+                    if ui.button(t("apply")).clicked() {
                         go = true;
                     }
-                    if ui.button(t("取消", "Cancel")).clicked() {
+                    if ui.button(t("cancel")).clicked() {
                         cancel = true;
                     }
                 });
@@ -1054,42 +976,36 @@ impl App {
         let mut keep = false;
         let mut revert = false;
 
-        egui::Window::new(t("显示设置确认", "Confirm display mode"))
+        egui::Window::new(t("confirm_display_mode"))
             .anchor(egui::Align2::CENTER_TOP, [0.0, 24.0])
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.set_min_width(380.0);
                 ui.label(crate::trf!(
-                    "{} 已切换到 {}",
-                    "{} switched to {}",
+                    "switched_to",
                     watchdog.output,
                     watchdog.mode.label()
                 ));
                 ui.add(
                     egui::ProgressBar::new(watchdog.fraction())
-                        .text(crate::trf!(
-                            "{} 秒",
-                            "{} s",
-                            watchdog.remaining_secs(),
-                        ))
+                        .text(crate::trf!("s", watchdog.remaining_secs()))
                         .animate(false),
                 );
                 ui.label(crate::trf!(
-                    "{} 秒后自动还原到 {}。",
-                    "{} seconds until auto-revert to {}.",
+                    "seconds_until_auto_revert_to",
                     watchdog.remaining_secs(),
                     watchdog.previous.label()
                 ));
                 ui.add_space(4.0);
                 ui.horizontal(|ui| {
-                    if ui.button(t("立即还原", "Roll back now")).clicked() {
+                    if ui.button(t("roll_back_now")).clicked() {
                         revert = true;
                     }
                     if ui
                         .add(
                             egui::Button::new(
-                                egui::RichText::new(t("保留此设置", "Keep this mode"))
+                                egui::RichText::new(t("keep_this_mode"))
                                     .strong()
                                     .color(egui::Color32::WHITE),
                             )
@@ -1106,10 +1022,7 @@ impl App {
             self.revert_mode();
         } else if keep {
             self.watchdog = None;
-            self.status = Some(StatusMessage::info(t(
-                "已保留新的显示模式",
-                "New display mode kept",
-            )));
+            self.status = Some(StatusMessage::info(t("new_display_mode_kept")));
         }
     }
 
@@ -1123,16 +1036,13 @@ impl App {
         };
         let mut close = false;
 
-        egui::Window::new(t("执行报告", "Apply report"))
+        egui::Window::new(t("apply_report"))
             .collapsible(false)
             .resizable(true)
             .default_width(560.0)
             .show(ctx, |ui| {
                 for file in &report.files {
-                    ui.label(crate::trf!(
-                        "写入：{file}",
-                        "Written: {file}",
-                    ));
+                    ui.label(crate::trf!("written", file));
                 }
                 if !report.files.is_empty() {
                     ui.separator();
@@ -1140,39 +1050,27 @@ impl App {
                 for result in &report.results {
                     ui.horizontal_wrapped(|ui| {
                         if result.ok {
-                            ui.colored_label(theme::OK, t("成功", "Success"));
+                            ui.colored_label(theme::OK, t("success"));
                         } else {
-                            ui.colored_label(theme::DANGER, t("失败", "Failed"));
+                            ui.colored_label(theme::DANGER, t("failed"));
                         }
                         ui.label(&result.title);
                     });
                     if let Some(err) = &result.error {
-                        ui.label(
-                            egui::RichText::new(err)
-                                .small()
-                                .color(theme::DANGER),
-                        );
+                        ui.label(egui::RichText::new(err).small().color(theme::DANGER));
                     }
                 }
                 if let Some(err) = &report.reconfigure_error {
                     ui.separator();
-                    ui.colored_label(
-                        theme::DANGER,
-                        t("labwc 重载失败", "labwc reload failed"),
-                    );
+                    ui.colored_label(theme::DANGER, t("labwc_reload_failed"));
                     ui.label(egui::RichText::new(err).small());
                 }
                 ui.separator();
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new(crate::trf!(
-                                "耗时 {} ms",
-                                "Took {} ms",
-                                report.elapsed_ms,
-                            ))
-                            .small(),
+                        egui::RichText::new(crate::trf!("took_ms", report.elapsed_ms)).small(),
                     );
-                    if ui.button(t("关闭", "Close")).clicked() {
+                    if ui.button(t("close")).clicked() {
                         close = true;
                     }
                 });

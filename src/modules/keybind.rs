@@ -2,9 +2,7 @@ use eframe::egui::{self, RichText};
 
 use crate::app::{attrs_to_input, keybind_remove_id, App, KeyPickTab, KeybindForm, KeybindView};
 use crate::core::keybinds;
-use crate::core::model::{
-    EditStatus, KeybindAction, KeybindEntry, ACTION_SUGGESTIONS,
-};
+use crate::core::model::{EditStatus, KeybindAction, KeybindEntry, ACTION_SUGGESTIONS};
 use crate::i18n::t;
 use crate::ui::theme;
 
@@ -16,15 +14,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         .unwrap_or(0);
 
     ui.horizontal(|ui| {
-        ui.selectable_value(
-            &mut app.keybind_view,
-            KeybindView::Edit,
-            t("编辑 / 新增", "Edit / Add"),
-        );
+        ui.selectable_value(&mut app.keybind_view, KeybindView::Edit, t("edit_add"));
         ui.selectable_value(
             &mut app.keybind_view,
             KeybindView::Existing,
-            crate::trf!("现有快捷键（{count}）", "Existing shortcuts ({count})"),
+            crate::trf!("existing_shortcuts", count),
         );
     });
     ui.separator();
@@ -41,10 +35,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
 
 fn edit_view(app: &mut App, ui: &mut egui::Ui) {
     ui.label(
-        RichText::new(t(
-            "直接填写 labwc keysym 组合与动作；也可以到“现有快捷键”页点编辑载入。",
-            "Type a labwc keysym combination and action, or load one from the Existing shortcuts tab.",
-        ))
+        RichText::new(t("type_a_labwc_keysym_combination_and_action_or_load_one_from_the_existing_shortcuts_tab"))
         .small()
         .weak(),
     );
@@ -53,8 +44,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             ui.colored_label(
                 theme::DANGER,
                 crate::trf!(
-                    "未找到 {}，快捷键无法写入。",
-                    "{} was not found; key bindings cannot be written.",
+                    "was_not_found_key_bindings_cannot_be_written",
                     baseline.rc_path.display()
                 ),
             );
@@ -64,22 +54,16 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
     ui.add_space(8.0);
     ui.group(|ui| {
         ui.horizontal(|ui| {
-            ui.label(t("按键组合", "Key combination"));
+            ui.label(t("key_combination"));
             ui.add(
                 egui::TextEdit::singleline(&mut app.keybind_form.key)
-                    .hint_text(t(
-                        "例如 W-C-S-t、W-Return、Print、XF86AudioMute",
-                        "e.g. W-C-S-t, W-Return, Print, XF86AudioMute",
-                    ))
+                    .hint_text(t("e_g_w_c_s_t_w_return_print_xf86audiomute"))
                     .desired_width(320.0)
                     .font(egui::TextStyle::Monospace),
             );
         });
         ui.label(
-            RichText::new(t(
-                "修饰键用 W / C / A / S；主键写 XKB keysym 名称。常见：Return、space、Left、Print、F12、XF86AudioMute。labwc 不支持多段按键序列。",
-                "Use W / C / A / S for modifiers and an XKB keysym name for the key. Common keysyms: Return, space, Left, Print, F12, XF86AudioMute. labwc does not support multi-step key sequences.",
-            ))
+            RichText::new(t("use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_return_space_left_print_f12_xf86audiomute_labwc_does_not_support_multi_step_key_sequences"))
             .small()
             .weak(),
         );
@@ -89,9 +73,9 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         let mut advanced = app.keybind_form.advanced;
         ui.horizontal(|ui| {
-            ui.label(t("动作模式", "Action mode"));
-            ui.selectable_value(&mut advanced, false, t("常用", "Common"));
-            ui.selectable_value(&mut advanced, true, t("高级 XML", "Advanced XML"));
+            ui.label(t("action_mode"));
+            ui.selectable_value(&mut advanced, false, t("common"));
+            ui.selectable_value(&mut advanced, true, t("advanced_xml"));
         });
         if advanced != app.keybind_form.advanced {
             app.keybind_form.advanced = advanced;
@@ -103,14 +87,14 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
         }
 
         if app.keybind_form.advanced {
-            ui.label(t("动作 XML（可写多个 action）", "Action XML (multiple actions allowed)"));
+            ui.label(t("action_xml_multiple_actions_allowed"));
             ui.add(
                 egui::TextEdit::multiline(&mut app.keybind_form.advanced_xml)
                     .code_editor()
                     .desired_rows(4)
                     .desired_width(f32::INFINITY),
             );
-            if ui.button(t("从常用字段重新生成", "Regenerate from common fields")).clicked() {
+            if ui.button(t("regenerate_from_common_fields")).clicked() {
                 match build_common_actions(&app.keybind_form) {
                     Ok(actions) => {
                         app.keybind_form.advanced_xml = keybinds::render_actions(&actions)
@@ -120,13 +104,13 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             }
         } else {
             ui.horizontal(|ui| {
-                ui.label(t("动作名称", "Action name"));
+                ui.label(t("action_name"));
                 ui.add(
                     egui::TextEdit::singleline(&mut app.keybind_form.action)
                         .desired_width(180.0),
                 );
                 egui::ComboBox::from_id_source("action-suggest")
-                    .selected_text(t("常用动作…", "Common actions…"))
+                    .selected_text(t("common_actions"))
                     .show_ui(ui, |ui| {
                         for name in ACTION_SUGGESTIONS {
                             let selected = app.keybind_form.action == *name;
@@ -137,24 +121,18 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
                     });
             });
             ui.horizontal(|ui| {
-                ui.label(t("命令", "Command"));
+                ui.label(t("command"));
                 ui.add(
                     egui::TextEdit::singleline(&mut app.keybind_form.command)
-                        .hint_text(t(
-                            "Execute 必填，例如 lxqt-qdbus run qterminal",
-                            "Required for Execute, e.g. lxqt-qdbus run qterminal",
-                        ))
+                        .hint_text(t("required_for_execute_e_g_lxqt_qdbus_run_qterminal"))
                         .desired_width(440.0),
                 );
             });
             ui.horizontal(|ui| {
-                ui.label(t("附加属性", "Extra attributes"));
+                ui.label(t("extra_attributes"));
                 ui.add(
                     egui::TextEdit::singleline(&mut app.keybind_form.attrs)
-                        .hint_text(t(
-                            "例如 direction=\"left\" combine=\"yes\"",
-                            "e.g. direction=\"left\" combine=\"yes\"",
-                        ))
+                        .hint_text(t("e_g_direction_left_combine_yes"))
                         .desired_width(440.0),
                 );
             });
@@ -162,10 +140,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
                 && app.keybind_form.advanced_xml.matches("<action").count() > 1
             {
                 ui.label(
-                    RichText::new(t(
-                        "注意：该绑定原本包含多个动作，用常用模式提交只会保留第一个动作；建议切到高级 XML。",
-                        "Note: this binding contains multiple actions. Submitting in Common mode keeps only the first one; use Advanced XML instead.",
-                    ))
+                    RichText::new(t("note_this_binding_contains_multiple_actions_submitting_in_common_mode_keeps_only_the_first_one_use_advanced_xml_instead"))
                     .small()
                     .color(theme::WARN),
                 );
@@ -173,7 +148,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
         }
 
         if let Ok(preview) = preview_for_form(&app.keybind_form) {
-            egui::CollapsingHeader::new(t("XML 预览", "XML preview")).show(ui, |ui| {
+            egui::CollapsingHeader::new(t("xml_preview")).show(ui, |ui| {
                 ui.label(RichText::new(preview).monospace().small());
             });
         }
@@ -184,10 +159,7 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
 
         if let Some(original) = &app.keybind_form.editing_original {
             ui.label(
-                RichText::new(crate::trf!(
-                    "正在编辑：{original}（键位上的其他属性会保留）",
-                    "Editing: {original} (other keybind attributes are preserved)",
-                ))
+                RichText::new(crate::trf!("editing_other_keybind_attributes_are_preserved", original))
                     .small()
                     .weak(),
             );
@@ -196,9 +168,9 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
             let submit_label = if app.keybind_form.editing_original.is_some() {
-                t("加入/更新队列", "Add / update queue")
+                t("add_update_queue")
             } else {
-                t("加入队列", "Add to queue")
+                t("add_to_queue")
             };
             if ui
                 .add(
@@ -213,23 +185,20 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             {
                 app.submit_keybind();
             }
-            if ui.button(t("清空表单", "Clear form")).clicked() {
+            if ui.button(t("clear_form")).clicked() {
                 app.reset_keybind_form();
             }
-            if app.keybind_form.editing_original.is_some() && ui.button(t("取消编辑", "Cancel editing")).clicked() {
+            if app.keybind_form.editing_original.is_some() && ui.button(t("cancel_editing")).clicked() {
                 app.reset_keybind_form();
             }
         });
     });
 
     ui.add_space(14.0);
-    ui.label(RichText::new(t("待执行快捷键", "Pending shortcuts")).strong());
+    ui.label(RichText::new(t("pending_shortcuts")).strong());
     if app.keybind_edits.is_empty() && app.keybind_deletions.is_empty() {
         ui.label(
-            RichText::new(t(
-                "队列为空。填写组合键和动作后加入，或到“现有快捷键”页编辑/删除。",
-                "The queue is empty. Fill in a key combination and action, or edit/delete from the Existing shortcuts tab.",
-            ))
+            RichText::new(t("the_queue_is_empty_fill_in_a_key_combination_and_action_or_edit_delete_from_the_existing_shortcuts_tab"))
             .small()
             .weak(),
         );
@@ -257,21 +226,20 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
                 if renamed {
                     ui.label(
                         RichText::new(crate::trf!(
-                            "原键 {}",
-                            "From {}",
+                            "from",
                             edit.original_key.clone().unwrap_or_default()
                         ))
                         .small()
                         .weak(),
                     );
                 }
-                if ui.small_button(t("移除", "Remove")).clicked() {
+                if ui.small_button(t("remove")).clicked() {
                     discard = Some(edit.clone());
                 }
             });
             if let Some(err) = failure {
                 ui.label(
-                    RichText::new(crate::trf!("失败：{err}", "Failed: {err}"))
+                    RichText::new(crate::trf!("failed_3", err))
                         .small()
                         .color(theme::DANGER),
                 );
@@ -287,14 +255,14 @@ fn edit_view(app: &mut App, ui: &mut egui::Ui) {
             let failure = app.failures.get(&keybind_remove_id(key)).cloned();
             ui.horizontal(|ui| {
                 ui.monospace(key);
-                ui.colored_label(theme::DANGER, t("待删除", "Pending delete"));
-                if ui.small_button(t("撤销", "Undo")).clicked() {
+                ui.colored_label(theme::DANGER, t("pending_delete"));
+                if ui.small_button(t("undo")).clicked() {
                     undo = Some(key.clone());
                 }
             });
             if let Some(err) = failure {
                 ui.label(
-                    RichText::new(crate::trf!("失败：{err}", "Failed: {err}"))
+                    RichText::new(crate::trf!("failed_3", err))
                         .small()
                         .color(theme::DANGER),
                 );
@@ -310,10 +278,10 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.add(
             egui::TextEdit::singleline(&mut app.keybind_filter)
-                .hint_text(t("搜索按键 / 动作 / 命令", "Search key / action / command"))
+                .hint_text(t("search_key_action_command"))
                 .desired_width(320.0),
         );
-        if !app.keybind_filter.is_empty() && ui.button(t("清除", "Clear")).clicked() {
+        if !app.keybind_filter.is_empty() && ui.button(t("clear")).clicked() {
             app.keybind_filter.clear();
         }
     });
@@ -335,8 +303,7 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
 
     ui.label(
         RichText::new(crate::trf!(
-            "显示 {} / {} 条 · 拖动表头分隔线调整列宽 · 点击“编辑”载入编辑页",
-            "Showing {} / {} · Drag header dividers to resize · Click Edit to load",
+            "showing_drag_header_dividers_to_resize_click_edit_to_load",
             filtered.len(),
             binds.len()
         ))
@@ -345,11 +312,11 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
     );
 
     if binds.is_empty() {
-        ui.label(RichText::new(t("没有读取到快捷键。", "No key bindings found.")).weak());
+        ui.label(RichText::new(t("no_key_bindings_found")).weak());
         return;
     }
     if filtered.is_empty() {
-        ui.label(RichText::new(t("没有匹配的快捷键。", "No matching key bindings.")).weak());
+        ui.label(RichText::new(t("no_matching_key_bindings")).weak());
         return;
     }
 
@@ -389,16 +356,16 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
         )
         .header(30.0, |mut header| {
             header.col(|ui| {
-                ui.strong(t("按键", "Key"));
+                ui.strong(t("key_2"));
             });
             header.col(|ui| {
-                ui.strong(t("动作 / 命令", "Action / Command"));
+                ui.strong(t("action_command"));
             });
             header.col(|ui| {
-                ui.strong(t("状态", "Status"));
+                ui.strong(t("status"));
             });
             header.col(|ui| {
-                ui.strong(t("操作", "Actions"));
+                ui.strong(t("actions_2"));
             });
         })
         .body(|body| {
@@ -413,10 +380,8 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
                     if !entry.attrs.is_empty() {
                         key_label.push_str(&format!(" [{}]", attrs_to_input(&entry.attrs)));
                     }
-                    ui.add(
-                        egui::Label::new(RichText::new(&key_label).monospace()).truncate(),
-                    )
-                    .on_hover_text(key_label);
+                    ui.add(egui::Label::new(RichText::new(&key_label).monospace()).truncate())
+                        .on_hover_text(key_label);
                 });
 
                 row.col(|ui| {
@@ -435,25 +400,23 @@ fn existing_view(app: &mut App, ui: &mut egui::Ui) {
                             == Some(keybinds::normalize_key(&entry.key).as_str())
                     });
                     if pending_delete {
-                        ui.colored_label(theme::DANGER, t("待删除", "Pending delete"));
+                        ui.colored_label(theme::DANGER, t("pending_delete"));
                     } else if pending_edit {
-                        ui.colored_label(theme::WARN, t("待更新", "Pending update"));
+                        ui.colored_label(theme::WARN, t("pending_update"));
                     }
                 });
 
                 row.col(|ui| {
                     if app.is_pending_deletion(&entry.key) {
-                        if ui.small_button(t("撤销删除", "Undo delete")).clicked() {
-                            pending_action =
-                                Some((BindAction::UndoDelete, entry.key.clone()));
+                        if ui.small_button(t("undo_delete")).clicked() {
+                            pending_action = Some((BindAction::UndoDelete, entry.key.clone()));
                         }
                     } else {
-                        if ui.small_button(t("编辑", "Edit")).clicked() {
+                        if ui.small_button(t("edit")).clicked() {
                             pending_action = Some((BindAction::Edit, entry.key.clone()));
                         }
-                        if ui.small_button(t("删除", "Delete")).clicked() {
-                            pending_action =
-                                Some((BindAction::Delete, entry.key.clone()));
+                        if ui.small_button(t("delete")).clicked() {
+                            pending_action = Some((BindAction::Delete, entry.key.clone()));
                         }
                     }
                 });
@@ -489,7 +452,7 @@ fn build_common_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String
     let attrs = keybinds::parse_attrs(&form.attrs)?;
     let command = form.command.trim().to_string();
     if form.action.trim() == "Execute" && command.is_empty() {
-        return Err(t("Execute 动作必须填写命令", "The Execute action requires a command").to_string());
+        return Err(t("the_execute_action_requires_a_command").to_string());
     }
     Ok(vec![KeybindAction {
         name: form.action.trim().to_string(),
@@ -584,7 +547,7 @@ fn soft_keyboard(app: &mut App, ui: &mut egui::Ui) {
     let mut changed = false;
     let (mods, _) = parse_parts(&key_value);
 
-    ui.label(RichText::new(t("软键盘", "Soft keyboard")).strong());
+    ui.label(RichText::new(t("soft_keyboard")).strong());
     ui.horizontal_wrapped(|ui| {
         if modifier_button(ui, "Super", mods.sup) {
             key_value = toggle_modifier(&key_value, 'W');
@@ -607,13 +570,17 @@ fn soft_keyboard(app: &mut App, ui: &mut egui::Ui) {
     let (_, base) = parse_parts(&key_value);
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
-        ui.label(t("主键", "Key"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Letters, t("字母", "Letters"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Digits, t("数字", "Digits"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Function, t("F 键", "F keys"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Navigation, t("导航", "Navigation"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Symbols, t("符号", "Symbols"));
-        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Media, t("多媒体", "Media"));
+        ui.label(t("key"));
+        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Letters, t("letters"));
+        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Digits, t("digits"));
+        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Function, t("f_keys"));
+        ui.selectable_value(
+            &mut app.keybind_pick_tab,
+            KeyPickTab::Navigation,
+            t("navigation"),
+        );
+        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Symbols, t("symbols"));
+        ui.selectable_value(&mut app.keybind_pick_tab, KeyPickTab::Media, t("media"));
     });
 
     let keys = pick_keys(app.keybind_pick_tab);
@@ -632,10 +599,7 @@ fn soft_keyboard(app: &mut App, ui: &mut egui::Ui) {
     }
 
     ui.label(
-        RichText::new(t(
-            "点击修饰键和主键即可组合；上方输入框仍可手输任意 keysym。",
-            "Click modifiers and a key to build the combination; the field above still accepts any keysym.",
-        ))
+        RichText::new(t("click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym"))
             .small()
             .weak(),
     );
@@ -658,9 +622,7 @@ fn modifier_button(ui: &mut egui::Ui, label: &str, active: bool) -> bool {
 
 fn key_button(ui: &mut egui::Ui, label: &str, value: &str, selected: bool) -> bool {
     let text = if selected {
-        RichText::new(label)
-            .monospace()
-            .color(egui::Color32::WHITE)
+        RichText::new(label).monospace().color(egui::Color32::WHITE)
     } else {
         RichText::new(label).monospace()
     };
@@ -684,7 +646,7 @@ fn pick_keys(tab: KeyPickTab) -> Vec<(String, &'static str)> {
         KeyPickTab::Media => {
             return MEDIA_KEYS
                 .iter()
-                .map(|(zh, en, value)| (t(zh, en).to_string(), *value))
+                .map(|(source, value)| (t(source).to_string(), *value))
                 .collect();
         }
     };
@@ -791,29 +753,29 @@ const SYMBOL_KEYS: [(&str, &str); 11] = [
     ("`", "grave"),
 ];
 
-const MEDIA_KEYS: [(&str, &str, &str); 22] = [
-    ("打印", "Print", "Print"),
-    ("菜单", "Menu", "Menu"),
-    ("静音", "Mute", "XF86AudioMute"),
-    ("音量-", "Vol-", "XF86AudioLowerVolume"),
-    ("音量+", "Vol+", "XF86AudioRaiseVolume"),
-    ("播放", "Play", "XF86AudioPlay"),
-    ("下一曲", "Next", "XF86AudioNext"),
-    ("上一曲", "Prev", "XF86AudioPrev"),
-    ("亮度-", "Bri-", "XF86MonBrightnessDown"),
-    ("亮度+", "Bri+", "XF86MonBrightnessUp"),
-    ("电源", "Power", "XF86PowerOff"),
-    ("睡眠", "Sleep", "XF86Sleep"),
-    ("休眠", "Susp", "XF86Suspend"),
-    ("搜索", "Search", "XF86Search"),
-    ("主页", "Home", "XF86HomePage"),
-    ("邮件", "Mail", "XF86Mail"),
-    ("计算器", "Calc", "XF86Calculator"),
-    ("显示", "Disp", "XF86Display"),
-    ("触摸板", "Touch", "XF86TouchpadToggle"),
-    ("无线", "WiFi", "XF86WLAN"),
-    ("电量", "Batt", "XF86Battery"),
-    ("录音", "Rec", "XF86AudioRecord"),
+const MEDIA_KEYS: [(&str, &str); 22] = [
+    ("print", "Print"),
+    ("menu", "Menu"),
+    ("mute", "XF86AudioMute"),
+    ("vol_2", "XF86AudioLowerVolume"),
+    ("vol", "XF86AudioRaiseVolume"),
+    ("play", "XF86AudioPlay"),
+    ("next", "XF86AudioNext"),
+    ("prev", "XF86AudioPrev"),
+    ("bri_2", "XF86MonBrightnessDown"),
+    ("bri", "XF86MonBrightnessUp"),
+    ("power", "XF86PowerOff"),
+    ("sleep", "XF86Sleep"),
+    ("susp", "XF86Suspend"),
+    ("search", "XF86Search"),
+    ("home", "XF86HomePage"),
+    ("mail", "XF86Mail"),
+    ("calc", "XF86Calculator"),
+    ("disp", "XF86Display"),
+    ("touch", "XF86TouchpadToggle"),
+    ("wifi", "XF86WLAN"),
+    ("batt", "XF86Battery"),
+    ("rec", "XF86AudioRecord"),
 ];
 
 #[cfg(test)]

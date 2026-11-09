@@ -5,14 +5,10 @@ use super::model::{Mode, OutputInfo};
 pub fn scan() -> Result<Vec<OutputInfo>, String> {
     let output = ProcessCommand::new("wlr-randr")
         .output()
-        .map_err(|err| crate::trf!("无法执行 wlr-randr：{err}", "Failed to run wlr-randr: {err}"))?;
+        .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(crate::trf!(
-            "wlr-randr 执行失败：{}",
-            "wlr-randr failed: {}",
-            stderr.trim()
-        ));
+        return Err(crate::trf!("wlr_randr_failed", stderr.trim()));
     }
     Ok(parse(&String::from_utf8_lossy(&output.stdout)))
 }
@@ -31,7 +27,11 @@ pub fn parse(text: &str) -> Vec<OutputInfo> {
             if let Some(item) = current.take() {
                 outputs.push(item);
             }
-            let name = line.split_whitespace().next().unwrap_or_default().to_string();
+            let name = line
+                .split_whitespace()
+                .next()
+                .unwrap_or_default()
+                .to_string();
             if name.is_empty() {
                 continue;
             }
@@ -68,10 +68,7 @@ pub fn parse(text: &str) -> Vec<OutputInfo> {
             if is_current {
                 item.current = Some(mode.clone());
             }
-            let duplicate = item
-                .modes
-                .iter()
-                .any(|existing| existing.same_mode(&mode));
+            let duplicate = item.modes.iter().any(|existing| existing.same_mode(&mode));
             if !duplicate {
                 item.modes.push(mode);
             }
@@ -88,8 +85,12 @@ pub fn parse(text: &str) -> Vec<OutputInfo> {
                 item.modes.push(current.clone());
             }
         }
-        item.modes
-            .sort_by(|a, b| b.width.cmp(&a.width).then(b.height.cmp(&a.height)).then(b.refresh.total_cmp(&a.refresh)));
+        item.modes.sort_by(|a, b| {
+            b.width
+                .cmp(&a.width)
+                .then(b.height.cmp(&a.height))
+                .then(b.refresh.total_cmp(&a.refresh))
+        });
     }
 
     outputs

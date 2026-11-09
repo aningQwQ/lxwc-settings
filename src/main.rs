@@ -31,7 +31,7 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1060.0, 760.0])
             .with_min_inner_size([880.0, 620.0])
-            .with_title(i18n::t("LXWC 设置中心", "LXWC Settings")),
+            .with_title(i18n::t("lxwc_settings_2")),
         ..Default::default()
     };
 

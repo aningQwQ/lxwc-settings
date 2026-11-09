@@ -10,7 +10,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         ui.horizontal(|ui| {
             if app.applying {
                 ui.spinner();
-                ui.label(RichText::new(t("执行中…", "Applying…")).small());
+                ui.label(RichText::new(t("applying")).small());
             } else if let Some(status) = &app.status {
                 let color = if status.error {
                     theme::DANGER
@@ -19,7 +19,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 };
                 ui.colored_label(color, RichText::new(&status.text).small());
             } else {
-                ui.label(RichText::new(t("就绪", "Ready")).small().weak());
+                ui.label(RichText::new(t("ready")).small().weak());
             }
 
             let pending = app.pending.len();
@@ -32,7 +32,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             let has_report = app.report.is_some();
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let apply_text = crate::trf!("确认应用（{pending}）", "Apply ({pending})");
+                let apply_text = crate::trf!("apply_2", pending);
                 let (fill, text_color) = if pending > 0 {
                     (theme::ACCENT, egui::Color32::WHITE)
                 } else {
@@ -41,10 +41,9 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                         ui.visuals().text_color(),
                     )
                 };
-                let apply_button = egui::Button::new(
-                    RichText::new(apply_text).strong().color(text_color),
-                )
-                .fill(fill);
+                let apply_button =
+                    egui::Button::new(RichText::new(apply_text).strong().color(text_color))
+                        .fill(fill);
                 if ui
                     .add_enabled(pending > 0 && !applying, apply_button)
                     .clicked()
@@ -53,24 +52,21 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 }
 
                 if ui
-                    .add_enabled(!applying, egui::Button::new(t("重新扫描", "Rescan")))
-                    .on_hover_text(t(
-                        "重置队列并恢复默认",
-                        "Reset queue and restore defaults",
-                    ))
+                    .add_enabled(!applying, egui::Button::new(t("rescan")))
+                    .on_hover_text(t("reset_queue_and_restore_defaults"))
                     .clicked()
                 {
                     app.refresh();
                 }
 
-                if has_report && ui.button(t("执行报告", "Report")).clicked() {
+                if has_report && ui.button(t("report")).clicked() {
                     app.report_open = true;
                 }
 
                 if failures > 0 {
-                    ui.colored_label(theme::DANGER, crate::trf!("失败 {failures} 项", "{failures} failed"));
+                    ui.colored_label(theme::DANGER, crate::trf!("failed_2", failures));
                 }
-                ui.label(crate::trf!("待执行 {pending} 项", "{pending} pending"));
+                ui.label(crate::trf!("pending", pending));
             });
         });
         ui.add_space(2.0);

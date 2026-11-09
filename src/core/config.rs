@@ -7,9 +7,7 @@ use super::model::Baseline;
 pub fn config_dir() -> PathBuf {
     std::env::var_os("LXWC_CONFIG_DIR")
         .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("XDG_CONFIG_HOME").map(|dir| PathBuf::from(dir).join("labwc"))
-        })
+        .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(|dir| PathBuf::from(dir).join("labwc")))
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config/labwc")))
         .unwrap_or_else(|| PathBuf::from(".config/labwc"))
 }
@@ -30,7 +28,7 @@ pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok((text, true)),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok((String::new(), false)),
-        Err(err) => Err(crate::trf!("读取 {} 失败：{err}", "Failed to read {}: {err}", path.display())),
+        Err(err) => Err(crate::trf!("failed_to_read", path.display(), err)),
     }
 }
 
@@ -60,26 +58,18 @@ pub fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
 
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
-            .map_err(|err| crate::trf!(
-            "创建目录 {} 失败：{err}",
-            "Failed to create directory {}: {err}",
-            parent.display()
-        ))?;
+            .map_err(|err| crate::trf!("failed_to_create_directory", parent.display(), err))?;
     }
 
     if path.exists() {
         let backup = with_suffix(path, ".lxwc.bak");
         std::fs::copy(path, &backup)
-            .map_err(|err| crate::trf!("备份 {} 失败：{err}", "Failed to back up {}: {err}", path.display()))?;
+            .map_err(|err| crate::trf!("failed_to_back_up", path.display(), err))?;
     }
 
     let tmp = with_suffix(path, ".lxwc.tmp");
     std::fs::write(&tmp, contents)
-        .map_err(|err| crate::trf!(
-        "写入临时文件 {} 失败：{err}",
-        "Failed to write temporary file {}: {err}",
-        tmp.display()
-    ))?;
+        .map_err(|err| crate::trf!("failed_to_write_temporary_file", tmp.display(), err))?;
 
     if let Ok(meta) = std::fs::metadata(path) {
         let _ = std::fs::set_permissions(&tmp, meta.permissions());
@@ -87,7 +77,7 @@ pub fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
 
     std::fs::rename(&tmp, path).map_err(|err| {
         let _ = std::fs::remove_file(&tmp);
-        crate::trf!("替换 {} 失败：{err}", "Failed to replace {}: {err}", path.display())
+        crate::trf!("failed_to_replace", path.display(), err)
     })
 }
 

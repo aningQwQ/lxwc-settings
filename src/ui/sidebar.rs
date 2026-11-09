@@ -10,19 +10,12 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .resizable(false)
         .show(ctx, |ui| {
             ui.add_space(12.0);
-            ui.heading(t("LXWC 设置", "LXWC Settings"));
-            ui.label(
-                RichText::new(t(
-                    "Labwc × LXQt 控制中心",
-                    "Labwc × LXQt Control Center",
-                ))
-                .small()
-                .weak(),
-            );
+            ui.heading(t("lxwc_settings"));
+            ui.label(RichText::new(t("labwc_lxqt_control_center")).small().weak());
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                ui.label(RichText::new(t("语言", "Language")).small().weak());
+                ui.label(RichText::new(t("language")).small().weak());
                 let mut new_lang = app.lang;
                 egui::ComboBox::from_id_source("language-select")
                     .selected_text(app.lang.label())

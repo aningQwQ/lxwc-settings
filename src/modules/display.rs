@@ -6,38 +6,32 @@ use crate::i18n::t;
 use crate::ui::theme;
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
-    ui.label(t(
-        "通过 wlr-randr 直接切换输出模式。应用后会弹出 15 秒确认窗口，未确认将自动回滚。",
-        "Switch output modes directly via wlr-randr. A 15-second confirmation window appears after applying; otherwise it rolls back automatically.",
-    ));
+    ui.label(t("switch_output_modes_directly_via_wlr_randr_a_15_second_confirmation_window_appears_after_applying_otherwise_it_rolls_back_automatically"));
     ui.add_space(8.0);
 
     ui.horizontal(|ui| {
         if ui
-            .button(t("重新扫描显示器", "Rescan displays"))
-            .on_hover_text(t(
-                "恢复当前分辨率",
-                "Restore current mode",
-            ))
+            .button(t("rescan_displays"))
+            .on_hover_text(t("restore_current_mode"))
             .clicked()
         {
             app.rescan_outputs();
         }
         if app.scanning {
             ui.spinner();
-            ui.label(RichText::new(t("扫描中…", "Scanning…")).weak());
+            ui.label(RichText::new(t("scanning")).weak());
         }
     });
 
     if let Some(err) = app.outputs_error.clone() {
         ui.add_space(8.0);
-        ui.colored_label(theme::DANGER, crate::trf!("扫描失败：{err}", "Scan failed: {err}"));
+        ui.colored_label(theme::DANGER, crate::trf!("scan_failed", err));
         return;
     }
 
     if app.outputs.is_empty() {
         ui.add_space(8.0);
-        ui.label(RichText::new(t("没有检测到任何输出。", "No outputs detected.")).weak());
+        ui.label(RichText::new(t("no_outputs_detected")).weak());
         return;
     }
 
@@ -46,11 +40,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let selected_name = app.selected_output.clone();
     let combo_text = selected_name
         .clone()
-        .unwrap_or_else(|| t("选择输出", "Select output").to_string());
+        .unwrap_or_else(|| t("select_output").to_string());
     let mut new_output: Option<String> = None;
 
     ui.horizontal(|ui| {
-        ui.label(t("输出设备", "Output"));
+        ui.label(t("output"));
         egui::ComboBox::from_id_source("output-combo")
             .width(300.0)
             .selected_text(combo_text)
@@ -59,7 +53,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                     let label = if output.enabled {
                         output.name.clone()
                     } else {
-                        crate::trf!("{}（未启用）", "{} (disabled)", output.name)
+                        crate::trf!("disabled", output.name)
                     };
                     let selected = selected_name.as_deref() == Some(output.name.as_str());
                     if ui.selectable_label(selected, label).clicked() {
@@ -83,22 +77,21 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(RichText::new(&output.name).strong());
             if output.enabled {
-                ui.colored_label(theme::OK, t("已启用", "Enabled"));
+                ui.colored_label(theme::OK, t("enabled"));
             } else {
-                ui.colored_label(theme::DANGER, t("未启用", "Disabled"));
+                ui.colored_label(theme::DANGER, t("disabled_2"));
             }
         });
         if !output.description.is_empty() {
             ui.label(RichText::new(&output.description).small().weak());
         }
         ui.label(crate::trf!(
-            "当前模式：{}",
-            "Current mode: {}",
+            "current_mode",
             output
                 .current
                 .as_ref()
                 .map(|mode| mode.label())
-                .unwrap_or_else(|| t("未知", "Unknown").to_string())
+                .unwrap_or_else(|| t("unknown").to_string())
         ));
     });
 
@@ -108,11 +101,11 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     let mode_combo_text = selected_mode
         .as_ref()
         .map(|mode| mode.label())
-        .unwrap_or_else(|| t("选择模式", "Select mode").to_string());
+        .unwrap_or_else(|| t("select_mode").to_string());
     let mut new_mode: Option<Mode> = None;
 
     ui.horizontal(|ui| {
-        ui.label(t("分辨率 / 刷新率", "Resolution / Refresh rate"));
+        ui.label(t("resolution_refresh_rate"));
         egui::ComboBox::from_id_source("mode-combo")
             .width(300.0)
             .selected_text(mode_combo_text)
@@ -125,7 +118,7 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
                         .map(|current| current.same_mode(mode))
                         .unwrap_or(false)
                     {
-                        label.push_str(t("（当前）", " (current)"));
+                        label.push_str(t("current"));
                     }
                     let selected = selected_mode
                         .as_ref()
@@ -160,18 +153,16 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     ui.add_space(10.0);
     let mut apply_clicked = false;
     ui.horizontal(|ui| {
-        let can_apply =
-            dirty && output.enabled && output.current.is_some() && !inflight && !waiting && !applying;
+        let can_apply = dirty
+            && output.enabled
+            && output.current.is_some()
+            && !inflight
+            && !waiting
+            && !applying;
         if ui
             .add_enabled(
                 can_apply,
-                egui::Button::new(
-                    RichText::new(t(
-                        "立即应用（15 秒后自动回滚）",
-                        "Apply now (auto-rollback in 15 s)",
-                    ))
-                    .strong(),
-                ),
+                egui::Button::new(RichText::new(t("apply_now_auto_rollback_in_15_s")).strong()),
             )
             .clicked()
         {
@@ -179,10 +170,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
         }
         if inflight {
             ui.spinner();
-            ui.label(RichText::new(t("正在切换…", "Switching…")).small());
+            ui.label(RichText::new(t("switching")).small());
         }
         if waiting {
-            ui.colored_label(theme::WARN, t("等待确认中…", "Waiting for confirmation…"));
+            ui.colored_label(theme::WARN, t("waiting_for_confirmation"));
         }
     });
     if apply_clicked {
@@ -192,30 +183,24 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     if !output.enabled {
         ui.label(
             RichText::new(t(
-                "输出未启用，禁止切换，避免无法回滚。",
-                "The output is disabled; switching is blocked to keep rollback possible.",
+                "the_output_is_disabled_switching_is_blocked_to_keep_rollback_possible",
             ))
-                .small()
-                .weak(),
+            .small()
+            .weak(),
         );
     } else if output.current.is_none() {
         ui.label(
             RichText::new(t(
-                "无法读取当前模式，已禁用自动回滚。",
-                "The current mode could not be read, so auto-rollback is disabled.",
+                "the_current_mode_could_not_be_read_so_auto_rollback_is_disabled",
             ))
-                .small()
-                .weak(),
+            .small()
+            .weak(),
         );
     }
 
     ui.add_space(10.0);
     ui.label(
-        RichText::new(crate::trf!(
-            "共 {} 个可用模式",
-            "{} available modes",
-            modes.len(),
-        ))
+        RichText::new(crate::trf!("available_modes", modes.len()))
             .small()
             .weak(),
     );

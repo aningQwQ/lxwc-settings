@@ -1,0 +1,220 @@
+# Simplified Chinese translations for LXWC Settings.
+# Format: <key><TAB><text>
+# Lines starting with # are comments. Keep the {} placeholders.
+
+about_to_apply_changes	即将执行 {} 项变更：
+action_command	动作 / 命令
+action_mode	动作模式
+action_name	动作名称
+action_name_cannot_be_empty	动作名称不能为空
+action_name_may_only_contain_letters_digits_and_underscores	动作名称只能包含字母、数字、下划线
+action_xml_multiple_actions_allowed	动作 XML（可写多个 action）
+actions	{}（{} 个动作）
+actions_2	操作
+add_to_queue	加入队列
+add_update_queue	加入/更新队列
+advanced_xml	高级 XML
+apply	执行
+apply_2	确认应用（{}）
+apply_now_auto_rollback_in_15_s	立即应用（15 秒后自动回滚）
+apply_report	执行报告
+applying	执行中…
+applying_changes	正在执行队列…
+at_least_one_action_is_required	至少需要一个 <action>
+attribute_has_an_unclosed_quote	属性 {} 的引号未闭合
+attribute_is_duplicated	属性 {} 重复
+attribute_is_missing	属性 {} 缺少等号
+attributes_must_use_key_value	属性格式应为 key=value
+available_modes	共 {} 个可用模式
+avoid_black_screens_or_corruption_with_some_streaming_and_virtual_outputs_caused_by_gpu_modifiers	规避部分串流、虚拟显示在 GPU 修饰符下的黑屏和花屏。
+batt	电量
+bri	亮度+
+bri_2	亮度-
+calc	计算器
+cancel	取消
+cancel_editing	取消编辑
+clear	清除
+clear_form	清空表单
+click_modifiers_and_a_key_to_build_the_combination_the_field_above_still_accepts_any_keysym	点击修饰键和主键即可组合；上方输入框仍可手输任意 keysym。
+close	关闭
+command	命令
+common	常用
+common_actions	常用动作…
+configuration_reloaded	配置已重新载入
+confirm_apply	确认执行
+confirm_display_mode	显示设置确认
+current	（当前）
+current_file	文件现状：{}
+current_mode	当前模式：{}
+delete	删除
+delete_from_the_environment_file	从 environment 文件中删除 {}
+delete_shortcut	删除快捷键 {}
+digits	数字
+disable_hardware_cursors	禁用硬件光标
+disabled	{}（未启用）
+disabled_2	未启用
+disp	显示
+display_output	显示与输出
+display_scan_failed	扫描显示器失败：{}
+does_not_exist_and_will_be_created_when_applying	{} 不存在，应用时会自动创建。
+done_succeeded	执行完成：成功 {} 项
+e_g_direction_left_combine_yes	例如 direction="left" combine="yes"
+e_g_w_c_s_t_w_return_print_xf86audiomute	例如 W-C-S-t、W-Return、Print、XF86AudioMute
+edit	编辑
+edit_add	编辑 / 新增
+edit_labwc_environment_for_streaming_and_compatibility_switches	修改 labwc environment，为串流与兼容性加开关。
+editing_other_keybind_attributes_are_preserved	正在编辑：{}（键位上的其他属性会保留）
+enabled	已启用
+enter_a_key_combination_e_g_w_c_s_t	请输入按键组合，例如 W-C-S-t
+enter_name_command_in_their_dedicated_fields	name / command 请在专用输入框填写
+environment_system	环境/系统模块
+environment_tweaks	环境变量魔改
+exactly_one_main_key_is_required_use_uppercase_w_c_a_s_for_modifiers	只能包含一个主键；修饰键请用大写 W / C / A / S
+existing_shortcuts	现有快捷键（{}）
+extra_attributes	附加属性
+f_keys	F 键
+failed	失败
+failed_2	失败 {} 项
+failed_3	失败：{}
+failed_kept_in_queue	，失败 {} 项（已保留在队列）
+failed_to_back_up	备份 {} 失败：{}
+failed_to_create_directory	创建目录 {} 失败：{}
+failed_to_invoke_pkill	无法调用 pkill：{}
+failed_to_parse_action_xml	动作 XML 解析失败：{}
+failed_to_parse_rc_xml	解析 rc.xml 失败：{}
+failed_to_read	读取 {} 失败：{}
+failed_to_read_configuration	读取配置失败：{}
+failed_to_reload_configuration	；重读配置失败：{}
+failed_to_replace	替换 {} 失败：{}
+failed_to_run_wlr_randr	无法执行 wlr-randr：{}
+failed_to_switch_mode	切换失败：{}
+failed_to_write_temporary_file	写入临时文件 {} 失败：{}
+files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry	写入前会备份为 *.lxwc.bak；失败的任务会留在队列中等待重试。
+force_linear_buffers	强制线性显存
+from	原键 {}
+home	主页
+invalid_attribute_name	非法属性名：{}
+keep_this_mode	保留此设置
+key	主键
+key_2	按键
+key_bindings	快捷键绑定
+key_combination	按键组合
+labwc_lxqt_control_center	Labwc × LXQt 控制中心
+labwc_reload_failed	labwc 重载失败
+labwc_reload_failed_2	；labwc 重载失败：{}
+language	语言
+letters	字母
+lxqt_module	LXQt 模块
+lxwc_settings	LXWC 设置
+lxwc_settings_2	LXWC 设置中心
+mail	邮件
+manage_outputs_directly_via_wlr_randr_with_a_15_second_rollback_watchdog	直接通过 wlr-randr 管理输出，带 15 秒防变砖回滚。
+media	多媒体
+menu	菜单
+mode_switched_but_the_previous_mode_is_unavailable_auto_rollback_is_disabled	已切换模式，但无法获取原模式，自动回滚未启用
+mute	静音
+navigation	导航
+new	新增
+new_display_mode_kept	已保留新的显示模式
+next	下一曲
+no_action	无动作
+no_change	无变化
+no_change_from_the_current_state_not_queued	与现状一致，未加入队列
+no_key_bindings_found	没有读取到快捷键。
+no_keyboard_node_found_in_rc_xml	rc.xml 中未找到 </keyboard> 节点
+no_matching_key_bindings	没有匹配的快捷键。
+no_outputs_detected	没有检测到任何输出。
+not_set	未设置
+note_this_binding_contains_multiple_actions_submitting_in_common_mode_keeps_only_the_first_one_use_advanced_xml_instead	注意：该绑定原本包含多个动作，用常用模式提交只会保留第一个动作；建议切到高级 XML。
+only_action_elements_are_allowed_extra_keybind_keyboard_elements_are_not	只能填写 action 元素，不能包含额外的 keybind/keyboard
+output	输出设备
+overwrite	覆盖
+overwrite_the_existing_binding_for_this_key_in_rc_xml	覆盖 rc.xml 中已有的同名按键
+pending	待执行 {} 项
+pending_delete	待删除
+pending_shortcuts	待执行快捷键
+pending_update	待更新
+pkill_hup_labwc_failed	pkill -HUP labwc 失败：{}
+play	播放
+power	电源
+prev	上一曲
+print	打印
+queued	已加入队列：{} → {}
+queued_for_deletion	已加入删除队列：{}
+rc_xml_is_empty_cannot_write_key_bindings	rc.xml 内容为空，无法写入快捷键
+ready	就绪
+rec	录音
+regenerate_from_common_fields	从常用字段重新生成
+reloading_configuration	正在重新读取配置…
+remove	移除
+remove_environment_variable	移除环境变量 {}
+rename	改键
+report	报告
+required_for_execute_e_g_lxqt_qdbus_run_qterminal	Execute 必填，例如 lxqt-qdbus run qterminal
+rescan	重新扫描
+rescan_displays	重新扫描显示器
+rescanning	正在重新扫描…
+reset_queue_and_restore_defaults	重置队列并恢复默认
+resolution_refresh_rate	分辨率 / 刷新率
+restore_current_mode	恢复当前分辨率
+restore_failed	还原失败：{}
+restored_to_its_previous_mode	{} 已还原到之前的模式
+restoring	正在还原 {} …
+roll_back_now	立即还原
+s	{} 秒
+scan_failed	扫描失败：{}
+scanning	扫描中…
+search	搜索
+search_key_action_command	搜索按键 / 动作 / 命令
+seconds_until_auto_revert_to	{} 秒后自动还原到 {}。
+select_mode	选择模式
+select_output	选择输出
+set	设置 {}={}
+shortcut	快捷键 {} → {}
+shortcut_has_no_action	快捷键 {} 没有动作
+showing_drag_header_dividers_to_resize_click_edit_to_load	显示 {} / {} 条 · 拖动表头分隔线调整列宽 · 点击“编辑”载入编辑页
+sleep	睡眠
+soft_keyboard	软键盘
+status	状态
+success	成功
+susp	休眠
+switch_output_modes_directly_via_wlr_randr_a_15_second_confirmation_window_appears_after_applying_otherwise_it_rolls_back_automatically	通过 wlr-randr 直接切换输出模式。应用后会弹出 15 秒确认窗口，未确认将自动回滚。
+switched_to	{} 已切换到 {}
+switched_to_confirm_within_seconds_or_it_will_roll_back	已切换到 {}，{} 秒内确认否则自动回滚
+switching	正在切换…
+switching_to	正在切换到 {}…
+symbols	符号
+takes_effect_after_re_login	{}：{}（重新登录后生效）
+the_combination_contains_an_empty_segment	组合中不能出现空段
+the_current_mode_could_not_be_read_so_auto_rollback_is_disabled	无法读取当前模式，已禁用自动回滚。
+the_execute_action_requires_a_command	Execute 动作必须填写命令
+the_key_combination_cannot_contain_spaces	按键组合中不能包含空格
+the_main_key_must_be_an_xkb_keysym_name_letters_digits_underscores	主键只支持 keysym 名称（字母、数字、下划线）
+the_output_is_disabled_refusing_to_switch	输出未启用，无法安全切换
+the_output_is_disabled_switching_is_blocked_to_keep_rollback_possible	输出未启用，禁止切换，避免无法回滚。
+the_patched_rc_xml_could_not_be_parsed_changes_were_cancelled	写入后的 rc.xml 无法解析，已取消：{}
+the_queue_is_empty_fill_in_a_key_combination_and_action_or_edit_delete_from_the_existing_shortcuts_tab	队列为空。填写组合键和动作后加入，或到“现有快捷键”页编辑/删除。
+the_target_key_conflicts_with_another_queued_change	目标按键与队列中的另一项修改冲突
+these_switches_are_written_to_config_labwc_environment_and_only_take_effect_the_next_time_the_labwc_session_starts	这些开关写入 ~/.config/labwc/environment，仅在下次启动 labwc 会话后生效。
+these_variables_are_not_hot_reloaded_log_out_and_back_in_to_verify_the_effect	提示：这些变量不会热重载。应用后请注销并重新登录以验证效果。
+took_ms	耗时 {} ms
+touch	触摸板
+type_a_labwc_keysym_combination_and_action_or_load_one_from_the_existing_shortcuts_tab	直接填写 labwc keysym 组合与动作；也可以到“现有快捷键”页点编辑载入。
+type_any_keysym_combination_and_action_and_edit_rc_xml_keybindings_directly	手动填写任意 keysym 组合与动作，直接编辑 rc.xml 快捷键。
+undo	撤销
+undo_delete	撤销删除
+unknown	未知
+update	更新
+use_a_software_cursor_to_fix_disappearing_or_ghosting_cursors_during_remote_streaming	改用软件光标，修复远程串流时鼠标消失或残影。
+use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_return_space_left_print_f12_xf86audiomute_labwc_does_not_support_multi_step_key_sequences	修饰键用 W / C / A / S；主键写 XKB keysym 名称。常见：Return、space、Left、Print、F12、XF86AudioMute。labwc 不支持多段按键序列。
+vol	音量+
+vol_2	音量-
+waiting_for_confirmation	等待确认中…
+was_not_found_key_bindings_cannot_be_written	未找到 {}，快捷键无法写入。
+wifi	无线
+wlr_module	WLR 模块
+wlr_randr_failed	wlr-randr 执行失败：{}
+wlr_randr_failed_to_switch_modes	wlr-randr 切换模式失败：{}
+write_a_new_key_binding	写入新的快捷键绑定
+written	写入：{}
+xml_preview	XML 预览

@@ -6,16 +6,12 @@ use crate::i18n::t;
 use crate::ui::theme;
 
 pub fn show(app: &mut App, ui: &mut egui::Ui) {
-    ui.label(t(
-        "这些开关写入 ~/.config/labwc/environment，仅在下次启动 labwc 会话后生效。",
-        "These switches are written to ~/.config/labwc/environment and only take effect the next time the labwc session starts.",
-    ));
+    ui.label(t("these_switches_are_written_to_config_labwc_environment_and_only_take_effect_the_next_time_the_labwc_session_starts"));
     if let Some(baseline) = &app.baseline {
         if !baseline.env_exists {
             ui.label(
                 RichText::new(crate::trf!(
-                    "{} 不存在，应用时会自动创建。",
-                    "{} does not exist and will be created when applying.",
+                    "does_not_exist_and_will_be_created_when_applying",
                     baseline.env_path.display()
                 ))
                 .small()
@@ -52,11 +48,10 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             ui.label(RichText::new(item.help()).small().weak());
             ui.label(
                 RichText::new(crate::trf!(
-                    "文件现状：{}",
-                    "Current file: {}",
+                    "current_file",
                     baseline_value
                         .map(|value| format!("{}={}", item.key, value))
-                        .unwrap_or_else(|| t("未设置", "Not set").to_string())
+                        .unwrap_or_else(|| t("not_set").to_string())
                 ))
                 .small(),
             );
@@ -75,10 +70,9 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     ui.separator();
     ui.label(
         RichText::new(t(
-            "提示：这些变量不会热重载。应用后请注销并重新登录以验证效果。",
-            "These variables are not hot-reloaded. Log out and back in to verify the effect.",
+            "these_variables_are_not_hot_reloaded_log_out_and_back_in_to_verify_the_effect",
         ))
-            .small()
-            .weak(),
+        .small()
+        .weak(),
     );
 }

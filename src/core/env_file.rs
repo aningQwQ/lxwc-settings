@@ -84,7 +84,11 @@ fn is_valid_key(key: &str) -> bool {
         && key
             .chars()
             .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
-        && !key.chars().next().map(|ch| ch.is_ascii_digit()).unwrap_or(true)
+        && !key
+            .chars()
+            .next()
+            .map(|ch| ch.is_ascii_digit())
+            .unwrap_or(true)
 }
 
 #[cfg(test)]
