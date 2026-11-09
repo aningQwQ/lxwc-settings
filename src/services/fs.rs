@@ -1,13 +1,5 @@
 use std::path::{Path, PathBuf};
 
-pub fn config_dir() -> PathBuf {
-    std::env::var_os("LXWC_CONFIG_DIR")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(|dir| PathBuf::from(dir).join("labwc")))
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config/labwc")))
-        .unwrap_or_else(|| PathBuf::from(".config/labwc"))
-}
-
 pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok((text, true)),

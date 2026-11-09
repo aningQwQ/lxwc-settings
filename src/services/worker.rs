@@ -4,7 +4,7 @@ use std::time::Instant;
 
 use eframe::egui;
 
-use super::config;
+use super::fs;
 
 use crate::core::model::{ApplyReport, Effect, Task, TaskResult};
 
@@ -75,7 +75,7 @@ fn apply_tasks(tasks: &[Task]) -> ApplyReport {
                     expected,
                 } => {
                     if let Err(err) =
-                        config::write_file_if_unchanged(path, expected.as_deref(), contents)
+                        fs::write_file_if_unchanged(path, expected.as_deref(), contents)
                     {
                         error = Some(err);
                         break;

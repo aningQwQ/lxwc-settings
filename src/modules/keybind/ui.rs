@@ -1,9 +1,11 @@
 use eframe::egui::{self, RichText};
 
-use super::file;
 use super::types::*;
 use super::KeybindModule;
 use crate::i18n::t;
+use crate::labwc::actions::{known_action_label, ACTION_SUGGESTIONS};
+use crate::labwc::rc_xml;
+use crate::labwc::rc_xml::{KeybindAction, KeybindEntry};
 use crate::modules::ModuleCtx;
 use crate::ui::theme;
 
@@ -79,7 +81,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
             module.form.advanced = advanced;
             if advanced && module.form.advanced_xml.trim().is_empty() {
                 if let Ok(actions) = build_common_actions(&module.form) {
-                    module.form.advanced_xml = file::render_actions(&actions);
+                    module.form.advanced_xml = rc_xml::render_actions(&actions);
                 }
             }
         }
@@ -95,7 +97,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
             if ui.button(t("regenerate_from_common_fields")).clicked() {
                 match build_common_actions(&module.form) {
                     Ok(actions) => {
-                        module.form.advanced_xml = file::render_actions(&actions)
+                        module.form.advanced_xml = rc_xml::render_actions(&actions)
                     }
                     Err(err) => module.form.error = Some(err),
                 }
@@ -237,7 +239,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
             let renamed = edit
                 .original_key
                 .as_ref()
-                .map(|original| file::normalize_key(original) != file::normalize_key(&edit.key))
+                .map(|original| rc_xml::normalize_key(original) != rc_xml::normalize_key(&edit.key))
                 .unwrap_or(false);
 
             ui.horizontal(|ui| {
@@ -402,9 +404,9 @@ fn existing_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut Module
                     let pending_edit = module.edits.iter().any(|edit| {
                         edit.original_key
                             .as_deref()
-                            .map(file::normalize_key)
+                            .map(rc_xml::normalize_key)
                             .as_deref()
-                            == Some(file::normalize_key(&entry.key).as_str())
+                            == Some(rc_xml::normalize_key(&entry.key).as_str())
                     });
                     if pending_delete {
                         ui.colored_label(theme::DANGER, t("pending_delete"));
@@ -458,8 +460,8 @@ fn status_color(status: EditStatus) -> egui::Color32 {
 }
 
 fn build_common_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String> {
-    file::validate_action_name(&form.action)?;
-    let attrs = file::parse_attrs(&form.attrs)?;
+    rc_xml::validate_action_name(&form.action)?;
+    let attrs = rc_xml::parse_attrs(&form.attrs)?;
     let command = form.command.trim().to_string();
     if form.action.trim() == "Execute" && command.is_empty() {
         return Err(t("the_execute_action_requires_a_command").to_string());
@@ -473,16 +475,16 @@ fn build_common_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String
 
 fn form_actions(form: &KeybindForm) -> Result<Vec<KeybindAction>, String> {
     if form.advanced {
-        file::parse_actions_fragment(&form.advanced_xml)
+        rc_xml::parse_actions_fragment(&form.advanced_xml)
     } else {
         build_common_actions(form)
     }
 }
 
 fn preview_for_form(form: &KeybindForm) -> Result<String, String> {
-    let key = file::validate_combo(&form.key)?;
+    let key = rc_xml::validate_combo(&form.key)?;
     let actions = form_actions(form)?;
-    Ok(file::render_keybind_preview(&key, &[], &actions))
+    Ok(rc_xml::render_keybind_preview(&key, &[], &actions))
 }
 
 #[derive(Clone, Copy, Default)]

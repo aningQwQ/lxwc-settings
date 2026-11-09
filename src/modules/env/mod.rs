@@ -1,5 +1,3 @@
-mod file;
-
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -7,17 +5,12 @@ use eframe::egui::{self, RichText};
 
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
+use crate::labwc::{environment, paths};
 use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
-use crate::services::config;
+use crate::services::fs;
 use crate::ui::theme;
 
 const ENV_TASK_ID: &str = "env";
-
-fn environment_path() -> PathBuf {
-    std::env::var_os("LXWC_ENVIRONMENT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| config::config_dir().join("environment"))
-}
 
 struct ManagedEnv {
     key: &'static str,
@@ -49,7 +42,7 @@ pub struct EnvModule {
 
 impl EnvModule {
     pub fn new() -> Self {
-        Self::with_path(environment_path())
+        Self::with_path(paths::environment())
     }
 
     fn with_path(path: PathBuf) -> Self {
@@ -64,11 +57,11 @@ impl EnvModule {
     }
 
     fn reload(&mut self, reset_desired: bool) {
-        match config::read_optional(&self.path) {
+        match fs::read_optional(&self.path) {
             Ok((raw, exists)) => {
                 self.raw = raw;
                 self.exists = exists;
-                self.baseline = file::parse_active(&self.raw);
+                self.baseline = environment::parse_active(&self.raw);
                 if reset_desired || self.desired.is_empty() {
                     self.desired.clear();
                     for item in MANAGED_ENV {
@@ -125,7 +118,7 @@ impl EnvModule {
             change_count: changes.len(),
             effects: vec![Effect::WriteFile {
                 path: self.path.clone(),
-                contents: file::patch(&self.raw, &sets, &unsets),
+                contents: environment::patch(&self.raw, &sets, &unsets),
                 expected: if self.exists {
                     Some(self.raw.clone())
                 } else {

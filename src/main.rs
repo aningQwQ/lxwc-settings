@@ -1,6 +1,7 @@
 mod app;
 mod core;
 mod i18n;
+mod labwc;
 mod modules;
 mod plugins;
 mod services;

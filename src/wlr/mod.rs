@@ -43,6 +43,30 @@ pub fn parse_spec(spec: &str) -> Option<Mode> {
     })
 }
 
+pub fn set_mode_command(output: &str, spec: &str) -> String {
+    format!("wlr-randr --output {output} --mode {spec}")
+}
+
+pub fn set_mode(output: &str, spec: &str) -> Result<(), String> {
+    let result = ProcessCommand::new("wlr-randr")
+        .args(["--output", output, "--mode", spec])
+        .output()
+        .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
+
+    if result.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&result.stderr);
+    let stdout = String::from_utf8_lossy(&result.stdout);
+    let detail = if stderr.trim().is_empty() {
+        stdout.trim()
+    } else {
+        stderr.trim()
+    };
+    Err(crate::trf!("wlr_randr_failed_to_switch_modes", detail))
+}
+
 pub fn scan() -> Result<Vec<OutputInfo>, String> {
     let output = ProcessCommand::new("wlr-randr")
         .output()
@@ -191,6 +215,14 @@ mod tests {
             refresh: 59.939999,
         };
         assert_eq!(mode.spec(), "1920x1080@59.939999Hz");
+    }
+
+    #[test]
+    fn builds_set_mode_command() {
+        assert_eq!(
+            set_mode_command("HDMI-A-1", "1920x1080@60.000000Hz"),
+            "wlr-randr --output HDMI-A-1 --mode 1920x1080@60.000000Hz"
+        );
     }
 
     #[test]

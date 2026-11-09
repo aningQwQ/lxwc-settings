@@ -4,16 +4,14 @@ use eframe::egui::{self, RichText};
 
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
+use crate::labwc::{autostart, paths};
 use crate::modules::{Category, ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
-use crate::services::config;
+use crate::services::fs;
 use crate::ui::theme;
 use crate::wlr::{self, Mode, OutputInfo};
 
 pub const MODULE_ID: &str = "labwc-display";
 const TASK_ID: &str = "display-default";
-const AUTOSTART_BEGIN: &str = "# BEGIN lxwc-settings default display";
-const AUTOSTART_END: &str = "# END lxwc-settings default display";
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum DisplayPersist {
     Static,
@@ -34,7 +32,7 @@ pub struct LabwcDisplayModule {
 
 impl LabwcDisplayModule {
     pub fn new() -> Self {
-        Self::with_path(config::config_dir().join("autostart"))
+        Self::with_path(paths::autostart())
     }
 
     fn with_path(autostart_path: PathBuf) -> Self {
@@ -54,7 +52,7 @@ impl LabwcDisplayModule {
     }
 
     fn reload_autostart(&mut self) {
-        match config::read_optional(&self.autostart_path) {
+        match fs::read_optional(&self.autostart_path) {
             Ok((raw, exists)) => {
                 self.autostart_raw = raw;
                 self.autostart_exists = exists;
@@ -129,8 +127,8 @@ impl LabwcDisplayModule {
         }
         let output_name = self.selected_output.as_ref()?;
         let mode = self.selected_mode.as_ref()?;
-        let command = format!("wlr-randr --output {} --mode {}", output_name, mode.spec());
-        let contents = autostart_contents(&self.autostart_raw, &command);
+        let command = wlr::set_mode_command(output_name, &mode.spec());
+        let contents = autostart::contents(&self.autostart_raw, &command);
         if contents == self.autostart_raw {
             return None;
         }
@@ -356,41 +354,6 @@ impl SettingsModule for LabwcDisplayModule {
     }
 }
 
-fn autostart_contents(raw: &str, command: &str) -> String {
-    let mut kept = String::new();
-    let mut skipping = false;
-
-    for line in raw.lines() {
-        let trimmed = line.trim();
-        if trimmed == AUTOSTART_BEGIN {
-            skipping = true;
-            continue;
-        }
-        if skipping {
-            if trimmed == AUTOSTART_END {
-                skipping = false;
-            }
-            continue;
-        }
-        kept.push_str(line);
-        kept.push('\n');
-    }
-
-    let kept = kept.trim_end_matches('\n');
-    let mut out = String::new();
-    if !kept.is_empty() {
-        out.push_str(kept);
-        out.push_str("\n\n");
-    }
-    out.push_str(AUTOSTART_BEGIN);
-    out.push('\n');
-    out.push_str(command);
-    out.push('\n');
-    out.push_str(AUTOSTART_END);
-    out.push('\n');
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -425,21 +388,6 @@ mod tests {
             warnings: Vec::new(),
             elapsed_ms: 0,
         }
-    }
-
-    #[test]
-    fn autostart_block_is_idempotent_and_preserves_content() {
-        let first = autostart_contents("", "wlr-randr --output A --mode 1x1@60.000000Hz");
-        assert!(first.contains(AUTOSTART_BEGIN));
-        assert!(first.contains("1x1"));
-        let second = autostart_contents(&first, "wlr-randr --output A --mode 1x1@60.000000Hz");
-        assert_eq!(first, second);
-        let replaced = autostart_contents(&first, "wlr-randr --output A --mode 2x2@60.000000Hz");
-        assert!(replaced.contains("2x2"));
-        assert!(!replaced.contains("1x1"));
-        let with_other = autostart_contents("foo\n", "cmd");
-        assert!(with_other.contains("foo"));
-        assert!(with_other.contains("cmd"));
     }
 
     #[test]

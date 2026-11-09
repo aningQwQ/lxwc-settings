@@ -567,10 +567,10 @@ fn spawn_worker(ui_ctx: egui::Context) -> (Sender<DisplayRequest>, Receiver<Disp
                     DisplayRequest::Scan => DisplayEvent::Outputs(wlr::scan()),
                     DisplayRequest::ApplyMode { output, spec } => DisplayEvent::ModeApplied {
                         output: output.clone(),
-                        result: run_wlr_randr(&output, &spec),
+                        result: wlr::set_mode(&output, &spec),
                     },
                     DisplayRequest::RevertMode { output, spec } => DisplayEvent::ModeReverted {
-                        result: run_wlr_randr(&output, &spec),
+                        result: wlr::set_mode(&output, &spec),
                         output,
                     },
                 };
@@ -580,24 +580,4 @@ fn spawn_worker(ui_ctx: egui::Context) -> (Sender<DisplayRequest>, Receiver<Disp
         });
 
     (request_tx, event_rx)
-}
-
-fn run_wlr_randr(output: &str, spec: &str) -> Result<(), String> {
-    let result = std::process::Command::new("wlr-randr")
-        .args(["--output", output, "--mode", spec])
-        .output()
-        .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
-
-    if result.status.success() {
-        return Ok(());
-    }
-
-    let stderr = String::from_utf8_lossy(&result.stderr);
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let detail = if stderr.trim().is_empty() {
-        stdout.trim()
-    } else {
-        stderr.trim()
-    };
-    Err(crate::trf!("wlr_randr_failed_to_switch_modes", detail))
 }

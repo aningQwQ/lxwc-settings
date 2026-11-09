@@ -2,7 +2,52 @@ use quick_xml::escape::unescape;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
 
-use super::types::{KeybindAction, KeybindEntry};
+use crate::i18n::t;
+use crate::labwc::actions::known_action_label;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeybindAction {
+    pub name: String,
+    pub command: String,
+    pub attrs: Vec<(String, String)>,
+}
+
+impl KeybindAction {
+    pub fn summary(&self) -> String {
+        let label = known_action_label(&self.name).unwrap_or(&self.name);
+        if self.name == "Execute" && !self.command.is_empty() {
+            return format!("{label}: {}", self.command);
+        }
+        if self.attrs.is_empty() {
+            label.to_string()
+        } else {
+            let attrs = self
+                .attrs
+                .iter()
+                .map(|(key, value)| format!("{key}=\"{value}\""))
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("{label} {attrs}")
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeybindEntry {
+    pub key: String,
+    pub attrs: Vec<(String, String)>,
+    pub actions: Vec<KeybindAction>,
+}
+
+impl KeybindEntry {
+    pub fn summary(&self) -> String {
+        match self.actions.len() {
+            0 => t("no_action").to_string(),
+            1 => self.actions[0].summary(),
+            count => crate::trf!("actions", self.actions[0].summary(), count),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Addition {

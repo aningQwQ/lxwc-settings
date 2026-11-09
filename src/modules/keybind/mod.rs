@@ -1,4 +1,3 @@
-mod file;
 mod types;
 mod ui;
 
@@ -8,19 +7,15 @@ use eframe::egui;
 
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
+use crate::labwc::rc_xml::{KeybindAction, KeybindEntry};
+use crate::labwc::{paths, rc_xml, reconfigure};
 use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
-use crate::services::config;
+use crate::services::fs;
 
 use types::*;
 
 const MODULE_ID: &str = "keybind";
 const TASK_ID: &str = "keybind";
-
-fn rc_path() -> PathBuf {
-    std::env::var_os("LXWC_RC_XML")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| config::config_dir().join("rc.xml"))
-}
 
 pub struct KeybindModule {
     path: PathBuf,
@@ -38,7 +33,7 @@ pub struct KeybindModule {
 
 impl KeybindModule {
     pub fn new() -> Self {
-        Self::with_path(rc_path())
+        Self::with_path(paths::rc_xml())
     }
 
     fn with_path(path: PathBuf) -> Self {
@@ -60,11 +55,11 @@ impl KeybindModule {
     }
 
     fn reload_rc(&mut self, reset: bool) {
-        match config::read_optional(&self.path) {
+        match fs::read_optional(&self.path) {
             Ok((raw, exists)) => {
                 self.raw = raw;
                 self.exists = exists;
-                match file::parse(&self.raw) {
+                match rc_xml::parse(&self.raw) {
                     Ok(keybinds) => {
                         self.baseline = keybinds;
                         self.error = None;
@@ -92,7 +87,7 @@ impl KeybindModule {
 
     fn load_for_edit(&mut self, key: &str) {
         self.view = KeybindView::Edit;
-        let normalized = file::normalize_key(key);
+        let normalized = rc_xml::normalize_key(key);
 
         let pending_edit = self
             .edits
@@ -100,7 +95,7 @@ impl KeybindModule {
             .find(|edit| {
                 edit.original_key
                     .as_deref()
-                    .map(file::normalize_key)
+                    .map(rc_xml::normalize_key)
                     .as_deref()
                     == Some(normalized.as_str())
             })
@@ -113,7 +108,7 @@ impl KeybindModule {
         let Some(entry) = self
             .baseline
             .iter()
-            .find(|entry| file::normalize_key(&entry.key) == normalized)
+            .find(|entry| rc_xml::normalize_key(&entry.key) == normalized)
         else {
             return;
         };
@@ -121,7 +116,7 @@ impl KeybindModule {
         let form = &mut self.form;
         form.editing_original = Some(entry.key.clone());
         form.key = entry.key.clone();
-        form.advanced_xml = file::render_actions(&entry.actions);
+        form.advanced_xml = rc_xml::render_actions(&entry.actions);
         form.advanced = entry.actions.len() > 1;
         form.error = None;
 
@@ -141,7 +136,7 @@ impl KeybindModule {
         let form = &mut self.form;
         form.editing_original = edit.original_key.clone();
         form.key = edit.key.clone();
-        form.advanced_xml = file::render_actions(&edit.actions);
+        form.advanced_xml = rc_xml::render_actions(&edit.actions);
         form.advanced = edit.actions.len() > 1;
         form.error = None;
         if let Some(action) = edit.actions.first() {
@@ -166,13 +161,13 @@ impl KeybindModule {
         }
         let form = self.form.clone();
 
-        let key = file::validate_combo(&form.key)?;
+        let key = rc_xml::validate_combo(&form.key)?;
 
         let actions = if form.advanced {
-            file::parse_actions_fragment(&form.advanced_xml)?
+            rc_xml::parse_actions_fragment(&form.advanced_xml)?
         } else {
-            file::validate_action_name(&form.action)?;
-            let attrs = file::parse_attrs(&form.attrs)?;
+            rc_xml::validate_action_name(&form.action)?;
+            let attrs = rc_xml::parse_attrs(&form.attrs)?;
             let command = form.command.trim().to_string();
             if form.action.trim() == "Execute" && command.is_empty() {
                 return Err(t("the_execute_action_requires_a_command").to_string());
@@ -188,10 +183,10 @@ impl KeybindModule {
             .editing_original
             .as_ref()
             .and_then(|original| {
-                let normalized = file::normalize_key(original);
+                let normalized = rc_xml::normalize_key(original);
                 self.baseline
                     .iter()
-                    .find(|entry| file::normalize_key(&entry.key) == normalized)
+                    .find(|entry| rc_xml::normalize_key(&entry.key) == normalized)
                     .map(|entry| entry.attrs.clone())
             })
             .unwrap_or_default();
@@ -209,13 +204,13 @@ impl KeybindModule {
                 .position(|existing| existing.original_key.as_deref() == Some(original.as_str()))
         });
 
-        let target = file::normalize_key(&edit.key);
+        let target = rc_xml::normalize_key(&edit.key);
         for (index, other) in self.edits.iter().enumerate() {
             if Some(index) == replace_index {
                 continue;
             }
-            let other_target = file::normalize_key(&other.key);
-            let other_original = other.original_key.as_deref().map(file::normalize_key);
+            let other_target = rc_xml::normalize_key(&other.key);
+            let other_original = other.original_key.as_deref().map(rc_xml::normalize_key);
             if other_target == target || other_original.as_deref() == Some(target.as_str()) {
                 return Err(t("the_target_key_conflicts_with_another_queued_change").to_string());
             }
@@ -225,9 +220,9 @@ impl KeybindModule {
             self.edits.remove(index);
         }
 
-        let original_norm = edit.original_key.as_deref().map(file::normalize_key);
+        let original_norm = edit.original_key.as_deref().map(rc_xml::normalize_key);
         self.deletions.retain(|key| {
-            let normalized = file::normalize_key(key);
+            let normalized = rc_xml::normalize_key(key);
             normalized != target && Some(normalized) != original_norm
         });
 
@@ -247,18 +242,18 @@ impl KeybindModule {
     }
 
     fn edit_status(&self, edit: &KeybindEdit) -> EditStatus {
-        let target = file::normalize_key(&edit.key);
+        let target = rc_xml::normalize_key(&edit.key);
         let target_entry = self
             .baseline
             .iter()
-            .find(|entry| file::normalize_key(&entry.key) == target);
+            .find(|entry| rc_xml::normalize_key(&entry.key) == target);
 
         if let Some(original) = &edit.original_key {
-            let original_norm = file::normalize_key(original);
+            let original_norm = rc_xml::normalize_key(original);
             let original_entry = self
                 .baseline
                 .iter()
-                .find(|entry| file::normalize_key(&entry.key) == original_norm);
+                .find(|entry| rc_xml::normalize_key(&entry.key) == original_norm);
             if original_norm == target {
                 match original_entry {
                     Some(entry) if entry.actions == edit.actions && entry.attrs == edit.attrs => {
@@ -289,19 +284,19 @@ impl KeybindModule {
     }
 
     fn delete(&mut self, key: &str) -> String {
-        let normalized = file::normalize_key(key);
+        let normalized = rc_xml::normalize_key(key);
         self.edits.retain(|edit| {
-            let target = file::normalize_key(&edit.key);
-            let original = edit.original_key.as_deref().map(file::normalize_key);
+            let target = rc_xml::normalize_key(&edit.key);
+            let original = edit.original_key.as_deref().map(rc_xml::normalize_key);
             target != normalized && original.as_deref() != Some(normalized.as_str())
         });
         self.deletions
-            .retain(|item| file::normalize_key(item) != normalized);
+            .retain(|item| rc_xml::normalize_key(item) != normalized);
         if self
             .form
             .editing_original
             .as_deref()
-            .map(file::normalize_key)
+            .map(rc_xml::normalize_key)
             .as_deref()
             == Some(normalized.as_str())
         {
@@ -310,7 +305,7 @@ impl KeybindModule {
         if let Some(entry) = self
             .baseline
             .iter()
-            .find(|entry| file::normalize_key(&entry.key) == normalized)
+            .find(|entry| rc_xml::normalize_key(&entry.key) == normalized)
         {
             self.deletions.push(entry.key.clone());
         }
@@ -318,16 +313,16 @@ impl KeybindModule {
     }
 
     fn undo_delete(&mut self, key: &str) {
-        let normalized = file::normalize_key(key);
+        let normalized = rc_xml::normalize_key(key);
         self.deletions
-            .retain(|item| file::normalize_key(item) != normalized);
+            .retain(|item| rc_xml::normalize_key(item) != normalized);
     }
 
     fn is_pending_deletion(&self, key: &str) -> bool {
-        let normalized = file::normalize_key(key);
+        let normalized = rc_xml::normalize_key(key);
         self.deletions
             .iter()
-            .any(|item| file::normalize_key(item) == normalized)
+            .any(|item| rc_xml::normalize_key(item) == normalized)
     }
 
     fn push_unique(keys: &mut Vec<String>, key: &str) {
@@ -361,11 +356,11 @@ impl SettingsModule for KeybindModule {
             let mut changes = Vec::new();
 
             for deletion in &self.deletions {
-                let normalized = file::normalize_key(deletion);
+                let normalized = rc_xml::normalize_key(deletion);
                 let Some(entry) = self
                     .baseline
                     .iter()
-                    .find(|entry| file::normalize_key(&entry.key) == normalized)
+                    .find(|entry| rc_xml::normalize_key(&entry.key) == normalized)
                 else {
                     continue;
                 };
@@ -378,18 +373,18 @@ impl SettingsModule for KeybindModule {
                     continue;
                 }
 
-                let target = file::normalize_key(&edit.key);
+                let target = rc_xml::normalize_key(&edit.key);
                 let target_entry = self
                     .baseline
                     .iter()
-                    .find(|entry| file::normalize_key(&entry.key) == target);
+                    .find(|entry| rc_xml::normalize_key(&entry.key) == target);
 
                 if let Some(original) = &edit.original_key {
-                    let original_norm = file::normalize_key(original);
+                    let original_norm = rc_xml::normalize_key(original);
                     if let Some(entry) = self
                         .baseline
                         .iter()
-                        .find(|entry| file::normalize_key(&entry.key) == original_norm)
+                        .find(|entry| rc_xml::normalize_key(&entry.key) == original_norm)
                     {
                         if original_norm != target {
                             changes.push(format!("{} → {}", entry.key, edit.key));
@@ -407,7 +402,7 @@ impl SettingsModule for KeybindModule {
                 if target_entry.is_some() {
                     Self::push_unique(&mut remove_keys, &edit.key);
                 }
-                additions.push(file::Addition {
+                additions.push(rc_xml::Addition {
                     key: edit.key.clone(),
                     attrs: edit.attrs.clone(),
                     actions: edit.actions.clone(),
@@ -415,7 +410,7 @@ impl SettingsModule for KeybindModule {
             }
 
             if !changes.is_empty() {
-                match file::patch(&self.raw, &additions, &remove_keys) {
+                match rc_xml::patch(&self.raw, &additions, &remove_keys) {
                     Ok(patched) => {
                         self.error = None;
                         tasks.push(Task {
@@ -434,14 +429,7 @@ impl SettingsModule for KeybindModule {
                                         None
                                     },
                                 },
-                                Effect::RunCommand {
-                                    program: "sh".to_string(),
-                                    args: vec![
-                                        "-c".to_string(),
-                                        "labwc --reconfigure || pkill -HUP -x labwc".to_string(),
-                                    ],
-                                    best_effort: true,
-                                },
+                                reconfigure_effect(),
                             ],
                         });
                     }
@@ -472,6 +460,15 @@ impl SettingsModule for KeybindModule {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
         ui::show(self, ui, ctx);
+    }
+}
+
+fn reconfigure_effect() -> Effect {
+    let command = reconfigure::command();
+    Effect::RunCommand {
+        program: command.program,
+        args: command.args,
+        best_effort: true,
     }
 }
 
