@@ -130,7 +130,7 @@ impl SettingsModule for EnvModule {
             id: "env",
             title_key: "environment_tweaks",
             subtitle_key: "edit_labwc_environment_for_streaming_and_compatibility_switches",
-            category: Category::Environment,
+            category: Category::Labwc,
         }
     }
 

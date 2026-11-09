@@ -1,7 +1,7 @@
 use crate::wlr::{Mode, OutputInfo};
 
-const BEGIN: &str = "# BEGIN lxwc-settings";
-const END: &str = "# END lxwc-settings";
+const BEGIN: &str = "# BEGIN lxwc-settings dynamic display";
+const END: &str = "# END lxwc-settings dynamic display";
 
 pub fn profile(
     outputs: &[OutputInfo],
@@ -50,19 +50,8 @@ pub fn profile(
 pub fn contents(raw: &str, profile: &str) -> String {
     let block = format!("{BEGIN}\n{profile}\n{END}");
 
-    if let Some(begin) = raw.find(BEGIN) {
-        if let Some(end_offset) = raw[begin..].find(END) {
-            let mut end = begin + end_offset + END.len();
-            if raw[end..].starts_with('\n') {
-                end += 1;
-            }
-            let mut output = String::with_capacity(raw.len() + block.len());
-            output.push_str(&raw[..begin]);
-            output.push_str(&block);
-            output.push('\n');
-            output.push_str(&raw[end..]);
-            return output;
-        }
+    if let Some(output) = replace_block(raw, BEGIN, END, &block) {
+        return output;
     }
 
     let mut output = raw.to_string();
@@ -77,6 +66,22 @@ pub fn contents(raw: &str, profile: &str) -> String {
     output.push_str(&block);
     output.push('\n');
     output
+}
+
+fn replace_block(raw: &str, begin_marker: &str, end_marker: &str, block: &str) -> Option<String> {
+    let begin = raw.find(begin_marker)?;
+    let end_start = begin + begin_marker.len();
+    let end = end_start + raw[end_start..].find(end_marker)? + end_marker.len();
+    let mut end = end;
+    if raw[end..].starts_with('\n') {
+        end += 1;
+    }
+    let mut output = String::with_capacity(raw.len() + block.len());
+    output.push_str(&raw[..begin]);
+    output.push_str(block);
+    output.push('\n');
+    output.push_str(&raw[end..]);
+    Some(output)
 }
 
 fn escape(text: &str) -> String {
@@ -145,6 +150,13 @@ mod tests {
         );
         assert!(profile.contains("output \"HDMI-A-1\" mode 2560x1440@59.950000Hz position 1920,0"));
         assert!(profile.contains("output \"DP-2\" disable"));
+    }
+
+    #[test]
+    fn uses_descriptive_head_and_tail_markers() {
+        let updated = contents("", "profile {\n}");
+        assert!(updated.contains("# BEGIN lxwc-settings dynamic display"));
+        assert!(updated.contains("# END lxwc-settings dynamic display"));
     }
 
     #[test]

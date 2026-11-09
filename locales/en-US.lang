@@ -113,7 +113,6 @@ enabled	Enabled
 enter_a_key_combination_e_g_w_c_s_t	Enter a key combination, e.g. W-C-S-t
 enter_name_command_in_their_dedicated_fields	Enter name / command in their dedicated fields
 environment_changes	Environment variables ({} changes)
-environment_system	Environment / System
 environment_tweaks	Environment Tweaks
 exactly_one_main_key_is_required_use_uppercase_w_c_a_s_for_modifiers	Exactly one main key is required; use uppercase W / C / A / S for modifiers
 existing_shortcuts	Existing shortcuts ({})
@@ -148,7 +147,6 @@ key	Key
 key_2	Key
 key_combination	Key combination
 keybind_changes	Key bindings ({} changes)
-labwc_lxqt_control_center	Labwc × LXQt Control Center
 labwc_module	Labwc Module
 labwc_reload_failed	labwc reload failed
 labwc_reload_failed_2	; labwc reload failed: {}

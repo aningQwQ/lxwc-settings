@@ -11,7 +11,11 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
         .show(ctx, |ui| {
             ui.add_space(12.0);
             ui.heading(t("lxwc_settings"));
-            ui.label(RichText::new(t("labwc_lxqt_control_center")).small().weak());
+            ui.label(
+                RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                    .small()
+                    .weak(),
+            );
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {

@@ -33,17 +33,15 @@ pub struct PatchOutcome {
 pub enum Category {
     Wlr,
     Labwc,
-    Environment,
 }
 
 impl Category {
-    pub const ALL: [Category; 3] = [Category::Wlr, Category::Labwc, Category::Environment];
+    pub const ALL: [Category; 2] = [Category::Wlr, Category::Labwc];
 
     pub fn label(self) -> &'static str {
         match self {
             Category::Wlr => t("wlr_module"),
             Category::Labwc => t("labwc_module"),
-            Category::Environment => t("environment_system"),
         }
     }
 }
