@@ -3,11 +3,47 @@
 # Lines starting with # are comments. Keep the {} placeholders.
 
 about_to_apply_changes	即将执行 {} 项变更：
+action_auto_place	自动放置
+action_close	关闭窗口
 action_command	动作 / 命令
+action_execute	执行命令
+action_exit	退出 labwc
+action_focus	聚焦窗口
+action_focus_output	聚焦输出
+action_go_to_desktop	切换工作区
+action_iconify	最小化
+action_lower	降低窗口
+action_maximize	最大化
 action_mode	动作模式
+action_move	移动窗口
+action_move_to	移动到
+action_move_to_output	移动到输出
 action_name	动作名称
 action_name_cannot_be_empty	动作名称不能为空
 action_name_may_only_contain_letters_digits_and_underscores	动作名称只能包含字母、数字、下划线
+action_next_window	下一个窗口
+action_previous_window	上一个窗口
+action_raise	提升窗口
+action_reconfigure	重载配置
+action_resize	调整大小
+action_resize_output	调整输出布局
+action_resize_to	调整到
+action_shade	卷起窗口
+action_show_menu	显示菜单
+action_snap_to_edge	贴边
+action_snap_to_region	贴到区域
+action_toggle_always_on_bottom	切换置底
+action_toggle_always_on_top	切换置顶
+action_toggle_decorations	切换窗口装饰
+action_toggle_fullscreen	切换全屏
+action_toggle_keybinds	切换快捷键
+action_toggle_maximize	切换最大化
+action_toggle_omnipresent	切换全工作区
+action_toggle_shade	切换卷起
+action_toggle_show_desktop	显示/隐藏桌面
+action_unfocus	取消聚焦
+action_unmaximize	取消最大化
+action_unshade	展开窗口
 action_xml_multiple_actions_allowed	动作 XML（可写多个 action）
 actions	{}（{} 个动作）
 actions_2	操作

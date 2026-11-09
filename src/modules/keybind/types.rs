@@ -7,13 +7,57 @@ pub struct KeybindAction {
     pub attrs: Vec<(String, String)>,
 }
 
+pub fn known_action_label(action: &str) -> Option<&'static str> {
+    let key = match action {
+        "Execute" => "action_execute",
+        "Reconfigure" => "action_reconfigure",
+        "Close" => "action_close",
+        "ToggleMaximize" => "action_toggle_maximize",
+        "ToggleFullscreen" => "action_toggle_fullscreen",
+        "ToggleShowDesktop" => "action_toggle_show_desktop",
+        "ShowMenu" => "action_show_menu",
+        "SnapToEdge" => "action_snap_to_edge",
+        "SnapToRegion" => "action_snap_to_region",
+        "NextWindow" => "action_next_window",
+        "PreviousWindow" => "action_previous_window",
+        "GoToDesktop" => "action_go_to_desktop",
+        "Move" => "action_move",
+        "MoveTo" => "action_move_to",
+        "Resize" => "action_resize",
+        "ResizeTo" => "action_resize_to",
+        "Exit" => "action_exit",
+        "Focus" => "action_focus",
+        "Raise" => "action_raise",
+        "Lower" => "action_lower",
+        "Unfocus" => "action_unfocus",
+        "Maximize" => "action_maximize",
+        "Unmaximize" => "action_unmaximize",
+        "Iconify" => "action_iconify",
+        "Shade" => "action_shade",
+        "Unshade" => "action_unshade",
+        "ToggleShade" => "action_toggle_shade",
+        "ToggleOmnipresent" => "action_toggle_omnipresent",
+        "ToggleAlwaysOnTop" => "action_toggle_always_on_top",
+        "ToggleAlwaysOnBottom" => "action_toggle_always_on_bottom",
+        "AutoPlace" => "action_auto_place",
+        "ToggleDecorations" => "action_toggle_decorations",
+        "ToggleKeybinds" => "action_toggle_keybinds",
+        "FocusOutput" => "action_focus_output",
+        "MoveToOutput" => "action_move_to_output",
+        "ResizeOutput" => "action_resize_output",
+        _ => return None,
+    };
+    Some(t(key))
+}
+
 impl KeybindAction {
     pub fn summary(&self) -> String {
+        let label = known_action_label(&self.name).unwrap_or(&self.name);
         if self.name == "Execute" && !self.command.is_empty() {
-            return format!("Execute: {}", self.command);
+            return format!("{label}: {}", self.command);
         }
         if self.attrs.is_empty() {
-            self.name.clone()
+            label.to_string()
         } else {
             let attrs = self
                 .attrs
@@ -21,7 +65,7 @@ impl KeybindAction {
                 .map(|(key, value)| format!("{key}=\"{value}\""))
                 .collect::<Vec<_>>()
                 .join(" ");
-            format!("{} {}", self.name, attrs)
+            format!("{label} {attrs}")
         }
     }
 }

@@ -107,12 +107,16 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
                     egui::TextEdit::singleline(&mut module.form.action)
                         .desired_width(180.0),
                 );
+                if let Some(label) = known_action_label(module.form.action.trim()) {
+                    ui.label(RichText::new(label).small().weak());
+                }
                 egui::ComboBox::from_id_source("action-suggest")
                     .selected_text(t("common_actions"))
                     .show_ui(ui, |ui| {
                         for name in ACTION_SUGGESTIONS {
                             let selected = module.form.action == *name;
-                            if ui.selectable_label(selected, *name).clicked() {
+                            let label = known_action_label(name).unwrap_or(*name);
+                            if ui.selectable_label(selected, label).clicked() {
                                 module.form.action = (*name).to_string();
                             }
                         }

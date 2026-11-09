@@ -3,11 +3,47 @@
 # Lines starting with # are comments. Keep the {} placeholders.
 
 about_to_apply_changes	About to apply {} changes:
+action_auto_place	Auto place
+action_close	Close window
 action_command	Action / Command
+action_execute	Execute command
+action_exit	Exit labwc
+action_focus	Focus window
+action_focus_output	Focus output
+action_go_to_desktop	Go to desktop
+action_iconify	Iconify
+action_lower	Lower window
+action_maximize	Maximize
 action_mode	Action mode
+action_move	Move window
+action_move_to	Move to
+action_move_to_output	Move to output
 action_name	Action name
 action_name_cannot_be_empty	Action name cannot be empty
 action_name_may_only_contain_letters_digits_and_underscores	Action name may only contain letters, digits and underscores
+action_next_window	Next window
+action_previous_window	Previous window
+action_raise	Raise window
+action_reconfigure	Reconfigure
+action_resize	Resize
+action_resize_output	Resize output
+action_resize_to	Resize to
+action_shade	Shade window
+action_show_menu	Show menu
+action_snap_to_edge	Snap to edge
+action_snap_to_region	Snap to region
+action_toggle_always_on_bottom	Toggle always on bottom
+action_toggle_always_on_top	Toggle always on top
+action_toggle_decorations	Toggle decorations
+action_toggle_fullscreen	Toggle fullscreen
+action_toggle_keybinds	Toggle keybinds
+action_toggle_maximize	Toggle maximize
+action_toggle_omnipresent	Toggle omnipresent
+action_toggle_shade	Toggle shade
+action_toggle_show_desktop	Toggle show desktop
+action_unfocus	Unfocus
+action_unmaximize	Unmaximize
+action_unshade	Unshade window
 action_xml_multiple_actions_allowed	Action XML (multiple actions allowed)
 actions	{} ({} actions)
 actions_2	Actions
