@@ -624,7 +624,17 @@ mod tests {
         };
         assert!(contents.contains("XKB_DEFAULT_LAYOUT=us"));
         assert!(contents.contains("XKB_DEFAULT_OPTIONS=grp:alt_shift_toggle"));
-        assert_eq!(contents.matches("# added by lxwc-settings").count(), 1);
+        assert_eq!(
+            contents
+                .matches("# BEGIN lxwc-settings environment")
+                .count(),
+            1
+        );
+        assert_eq!(
+            contents.matches("# END lxwc-settings environment").count(),
+            1
+        );
+        assert!(!contents.contains("# added by lxwc-settings"));
 
         std::fs::remove_dir_all(dir).ok();
     }
