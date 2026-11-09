@@ -5,10 +5,10 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 
-use crate::core::config;
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
 use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
+use crate::services::config;
 use crate::ui::theme;
 
 const ENV_TASK_ID: &str = "env";

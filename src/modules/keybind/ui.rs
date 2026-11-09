@@ -127,7 +127,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
                 egui::ComboBox::from_id_source("lxqt-presets")
                     .selected_text(t("choose_preset"))
                     .show_ui(ui, |ui| {
-                        for preset in crate::modules::lxqt::PRESETS {
+                        for preset in crate::plugins::lxqt::PRESETS {
                             let response =
                                 ui.selectable_label(false, t(preset.label_key));
                             if response.on_hover_text(preset.command).clicked() {

@@ -97,5 +97,3 @@ pub mod display;
 pub mod env;
 pub mod keybind;
 pub mod labwc_display;
-pub mod lxqt;
-pub mod wlr;

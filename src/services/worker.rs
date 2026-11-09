@@ -5,7 +5,8 @@ use std::time::Instant;
 use eframe::egui;
 
 use super::config;
-use super::model::{ApplyReport, Effect, Task, TaskResult};
+
+use crate::core::model::{ApplyReport, Effect, Task, TaskResult};
 
 pub enum WorkerRequest {
     ApplyTasks(Vec<Task>),

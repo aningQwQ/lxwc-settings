@@ -6,11 +6,11 @@ use eframe::egui::{self, RichText};
 use crate::core::model::{ApplyReport, Task};
 use crate::i18n::t;
 use crate::modules::labwc_display::MODULE_ID as LABWC_DISPLAY_MODULE_ID;
-use crate::modules::wlr::{self, Mode, OutputInfo};
 use crate::modules::{
     Category, ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule,
 };
 use crate::ui::theme;
+use crate::wlr::{self, Mode, OutputInfo};
 
 const WATCHDOG_SECONDS: u64 = 15;
 

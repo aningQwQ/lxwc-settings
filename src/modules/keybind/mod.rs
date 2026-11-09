@@ -6,10 +6,10 @@ use std::path::PathBuf;
 
 use eframe::egui;
 
-use crate::core::config;
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
 use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
+use crate::services::config;
 
 use types::*;
 

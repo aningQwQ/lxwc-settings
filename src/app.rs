@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use eframe::egui;
 
 use crate::core::model::{ApplyReport, Task};
-use crate::core::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::i18n::{self, t, Lang};
 use crate::modules::{self, ModuleCtx, SettingsModule, StatusMessage};
+use crate::services::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::ui::{sidebar, status_bar, theme};
 
 pub struct App {

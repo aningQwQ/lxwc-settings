@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 
-use crate::core::config;
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
-use crate::modules::wlr::{self, Mode, OutputInfo};
 use crate::modules::{Category, ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
+use crate::services::config;
 use crate::ui::theme;
+use crate::wlr::{self, Mode, OutputInfo};
 
 pub const MODULE_ID: &str = "labwc-display";
 const TASK_ID: &str = "display-default";

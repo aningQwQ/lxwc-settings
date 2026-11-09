@@ -2,7 +2,10 @@ mod app;
 mod core;
 mod i18n;
 mod modules;
+mod plugins;
+mod services;
 mod ui;
+mod wlr;
 
 use std::process::Command as ProcessCommand;
 
