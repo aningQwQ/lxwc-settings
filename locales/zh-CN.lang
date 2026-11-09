@@ -61,6 +61,8 @@ attribute_has_an_unclosed_quote	属性 {} 的引号未闭合
 attribute_is_duplicated	属性 {} 重复
 attribute_is_missing	属性 {} 缺少等号
 attributes_must_use_key_value	属性格式应为 key=value
+autostart_command	写入 autostart：{}
+autostart_path	目标文件：{}
 available_modes	共 {} 个可用模式
 avoid_black_screens_or_corruption_with_some_streaming_and_virtual_outputs_caused_by_gpu_modifiers	规避部分串流、虚拟显示在 GPU 修饰符下的黑屏和花屏。
 batt	电量
@@ -84,6 +86,9 @@ confirm_display_mode	显示设置确认
 current	（当前）
 current_file	文件现状：{}
 current_mode	当前模式：{}
+default_display_configuration	默认显示配置
+default_display_persisted	已固化到 autostart
+default_display_subtitle	把当前临时分辨率固化为登录默认。
 delete	删除
 delete_from_the_environment_file	从 environment 文件中删除 {}
 delete_shortcut	删除快捷键 {}
@@ -92,10 +97,13 @@ disable_hardware_cursors	禁用硬件光标
 disabled	{}（未启用）
 disabled_2	未启用
 disp	显示
+display_default_handed_off	已移交到 Labwc 模块，请选择持久化方式
 display_output	显示与输出
 display_scan_failed	扫描显示器失败：{}
 does_not_exist_and_will_be_created_when_applying	{} 不存在，应用时会自动创建。
 done_succeeded	执行完成：成功 {} 项
+dynamic_not_implemented	动态感知暂未实现
+dynamic_persist	动态感知（kanshi profile）
 e_g_direction_left_combine_yes	例如 direction="left" combine="yes"
 e_g_w_c_s_t_w_return_print_xf86audiomute	例如 W-C-S-t、W-Return、Print、XF86AudioMute
 edit	编辑
@@ -171,10 +179,12 @@ next	下一曲
 no_action	无动作
 no_change	无变化
 no_change_from_the_current_state_not_queued	与现状一致，未加入队列
+no_display_default_selected	尚未接收显示模式
 no_key_bindings_found	没有读取到快捷键。
 no_keyboard_node_found_in_rc_xml	rc.xml 中未找到 </keyboard> 节点
 no_matching_key_bindings	没有匹配的快捷键。
 no_outputs_detected	没有检测到任何输出。
+no_selection_hint	请选择要固化的输出和模式
 not_set	未设置
 note_this_binding_contains_multiple_actions_submitting_in_common_mode_keeps_only_the_first_one_use_advanced_xml_instead	注意：该绑定原本包含多个动作，用常用模式提交只会保留第一个动作；建议切到高级 XML。
 only_action_elements_are_allowed_extra_keybind_keyboard_elements_are_not	只能填写 action 元素，不能包含额外的 keybind/keyboard
@@ -185,6 +195,8 @@ pending	待执行 {} 项
 pending_delete	待删除
 pending_shortcuts	待执行快捷键
 pending_update	待更新
+persist_default_display	固化默认显示配置
+persistence_options	持久化选项
 pkill_hup_labwc_failed	pkill -HUP labwc 失败：{}
 play	播放
 power	电源
@@ -222,11 +234,14 @@ seconds_until_auto_revert_to	{} 秒后自动还原到 {}。
 select_mode	选择模式
 select_output	选择输出
 set	设置 {}={}
+set_as_boot_default	设为开机默认
+set_from_wlr_hint	在 WLR 模块的 15 秒确认面板点击“设为开机默认”，配置会出现在这里。
 shortcut	快捷键 {} → {}
 shortcut_has_no_action	快捷键 {} 没有动作
 showing_drag_header_dividers_to_resize_click_edit_to_load	显示 {} / {} 条 · 拖动表头分隔线调整列宽 · 点击“编辑”载入编辑页
 sleep	睡眠
 soft_keyboard	软键盘
+static_persist	静态固化（写入 autostart）
 status	状态
 success	成功
 susp	休眠
@@ -237,6 +252,7 @@ switching	正在切换…
 switching_to	正在切换到 {}…
 symbols	符号
 takes_effect_after_re_login	{}：{}（重新登录后生效）
+temporary_mode	临时模式：{} {}
 the_combination_contains_an_empty_segment	组合中不能出现空段
 the_current_mode_could_not_be_read_so_auto_rollback_is_disabled	无法读取当前模式，已禁用自动回滚。
 the_execute_action_requires_a_command	Execute 动作必须填写命令
@@ -258,6 +274,7 @@ undo_delete	撤销删除
 unknown	未知
 update	更新
 use_a_software_cursor_to_fix_disappearing_or_ghosting_cursors_during_remote_streaming	改用软件光标，修复远程串流时鼠标消失或残影。
+use_current_mode	使用当前模式
 use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_return_space_left_print_f12_xf86audiomute_labwc_does_not_support_multi_step_key_sequences	修饰键用 W / C / A / S；主键写 XKB keysym 名称。常见：Return、space、Left、Print、F12、XF86AudioMute。labwc 不支持多段按键序列。
 vol	音量+
 vol_2	音量-
@@ -266,6 +283,7 @@ warnings	警告
 warnings_suffix	，警告 {} 条
 was_not_found_key_bindings_cannot_be_written	未找到 {}，快捷键无法写入。
 wifi	无线
+will_persist	将固化：{} {}
 wlr_module	WLR 模块
 wlr_randr_failed	wlr-randr 执行失败：{}
 wlr_randr_failed_to_switch_modes	wlr-randr 切换模式失败：{}

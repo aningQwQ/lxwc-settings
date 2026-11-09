@@ -1,6 +1,47 @@
 use std::process::Command as ProcessCommand;
 
-use super::{Mode, OutputInfo};
+#[derive(Clone, Debug, PartialEq)]
+pub struct Mode {
+    pub width: u32,
+    pub height: u32,
+    pub refresh: f64,
+}
+
+impl Mode {
+    pub fn spec(&self) -> String {
+        format!("{}x{}@{:.6}Hz", self.width, self.height, self.refresh)
+    }
+
+    pub fn label(&self) -> String {
+        format!("{} × {} @ {:.2} Hz", self.width, self.height, self.refresh)
+    }
+
+    pub fn same_mode(&self, other: &Mode) -> bool {
+        self.width == other.width
+            && self.height == other.height
+            && (self.refresh - other.refresh).abs() < 0.001
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct OutputInfo {
+    pub name: String,
+    pub description: String,
+    pub enabled: bool,
+    pub current: Option<Mode>,
+    pub modes: Vec<Mode>,
+}
+
+pub fn parse_spec(spec: &str) -> Option<Mode> {
+    let (dims, refresh) = spec.split_once('@')?;
+    let (width, height) = dims.split_once('x')?;
+    let refresh = refresh.strip_suffix("Hz")?;
+    Some(Mode {
+        width: width.parse().ok()?,
+        height: height.parse().ok()?,
+        refresh: refresh.parse().ok()?,
+    })
+}
 
 pub fn scan() -> Result<Vec<OutputInfo>, String> {
     let output = ProcessCommand::new("wlr-randr")
@@ -150,5 +191,13 @@ mod tests {
             refresh: 59.939999,
         };
         assert_eq!(mode.spec(), "1920x1080@59.939999Hz");
+    }
+
+    #[test]
+    fn parses_mode_spec() {
+        let mode = parse_spec("1920x1080@60.000000Hz").unwrap();
+        assert_eq!(mode.width, 1920);
+        assert_eq!(mode.height, 1080);
+        assert!((mode.refresh - 60.0).abs() < 0.001);
     }
 }

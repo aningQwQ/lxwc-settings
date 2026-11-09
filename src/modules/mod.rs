@@ -54,9 +54,19 @@ impl StatusMessage {
     }
 }
 
+pub struct ModuleRequest {
+    pub target: &'static str,
+    pub payload: ModulePayload,
+}
+
+pub enum ModulePayload {
+    DisplayDefault { output: String, spec: String },
+}
+
 pub struct ModuleCtx<'a> {
     pub failures: &'a HashMap<String, String>,
     pub status: &'a mut Option<StatusMessage>,
+    pub requests: &'a mut Vec<ModuleRequest>,
 }
 
 impl ModuleCtx<'_> {
@@ -76,6 +86,8 @@ pub trait SettingsModule {
     fn on_applied(&mut self, report: &ApplyReport);
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut ModuleCtx);
 
+    fn on_message(&mut self, _payload: &ModulePayload) {}
+
     fn update(&mut self, _ui_ctx: &egui::Context, _ctx: &mut ModuleCtx) {}
 
     fn overlay(&mut self, _ui_ctx: &egui::Context, _ctx: &mut ModuleCtx) {}
@@ -84,4 +96,6 @@ pub trait SettingsModule {
 pub mod display;
 pub mod env;
 pub mod keybind;
+pub mod labwc_display;
 pub mod lxqt;
+pub mod wlr;

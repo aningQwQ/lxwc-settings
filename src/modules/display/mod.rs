@@ -1,5 +1,3 @@
-mod output;
-
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::{Duration, Instant};
 
@@ -7,42 +5,14 @@ use eframe::egui::{self, RichText};
 
 use crate::core::model::{ApplyReport, Task};
 use crate::i18n::t;
-use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule};
+use crate::modules::labwc_display::MODULE_ID as LABWC_DISPLAY_MODULE_ID;
+use crate::modules::wlr::{self, Mode, OutputInfo};
+use crate::modules::{
+    Category, ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule,
+};
 use crate::ui::theme;
 
 const WATCHDOG_SECONDS: u64 = 15;
-
-#[derive(Clone, Debug, PartialEq)]
-pub(super) struct Mode {
-    pub width: u32,
-    pub height: u32,
-    pub refresh: f64,
-}
-
-impl Mode {
-    fn spec(&self) -> String {
-        format!("{}x{}@{:.6}Hz", self.width, self.height, self.refresh)
-    }
-
-    fn label(&self) -> String {
-        format!("{} × {} @ {:.2} Hz", self.width, self.height, self.refresh)
-    }
-
-    fn same_mode(&self, other: &Mode) -> bool {
-        self.width == other.width
-            && self.height == other.height
-            && (self.refresh - other.refresh).abs() < 0.001
-    }
-}
-
-#[derive(Clone, Debug)]
-pub(super) struct OutputInfo {
-    pub name: String,
-    pub description: String,
-    pub enabled: bool,
-    pub current: Option<Mode>,
-    pub modes: Vec<Mode>,
-}
 
 #[derive(Clone, Debug)]
 struct PendingModeChange {
@@ -520,13 +490,14 @@ impl SettingsModule for DisplayModule {
         };
         let mut keep = false;
         let mut revert = false;
+        let mut set_default = false;
 
         egui::Window::new(t("confirm_display_mode"))
             .anchor(egui::Align2::CENTER_TOP, [0.0, 24.0])
             .collapsible(false)
             .resizable(false)
             .show(ui_ctx, |ui| {
-                ui.set_min_width(380.0);
+                ui.set_min_width(440.0);
                 ui.label(crate::trf!(
                     "switched_to",
                     watchdog.output,
@@ -543,14 +514,17 @@ impl SettingsModule for DisplayModule {
                     watchdog.previous.label()
                 ));
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
+                ui.horizontal_wrapped(|ui| {
                     if ui.button(t("roll_back_now")).clicked() {
                         revert = true;
+                    }
+                    if ui.button(t("keep_this_mode")).clicked() {
+                        keep = true;
                     }
                     if ui
                         .add(
                             egui::Button::new(
-                                RichText::new(t("keep_this_mode"))
+                                RichText::new(t("set_as_boot_default"))
                                     .strong()
                                     .color(egui::Color32::WHITE),
                             )
@@ -558,7 +532,7 @@ impl SettingsModule for DisplayModule {
                         )
                         .clicked()
                     {
-                        keep = true;
+                        set_default = true;
                     }
                 });
             });
@@ -568,6 +542,15 @@ impl SettingsModule for DisplayModule {
         } else if keep {
             self.watchdog = None;
             ctx.info(t("new_display_mode_kept"));
+        } else if set_default {
+            let output = watchdog.output.clone();
+            let spec = watchdog.mode.spec();
+            self.watchdog = None;
+            ctx.requests.push(ModuleRequest {
+                target: LABWC_DISPLAY_MODULE_ID,
+                payload: ModulePayload::DisplayDefault { output, spec },
+            });
+            ctx.info(t("display_default_handed_off"));
         }
     }
 }
@@ -581,7 +564,7 @@ fn spawn_worker(ui_ctx: egui::Context) -> (Sender<DisplayRequest>, Receiver<Disp
         .spawn(move || {
             while let Ok(request) = request_rx.recv() {
                 let event = match request {
-                    DisplayRequest::Scan => DisplayEvent::Outputs(output::scan()),
+                    DisplayRequest::Scan => DisplayEvent::Outputs(wlr::scan()),
                     DisplayRequest::ApplyMode { output, spec } => DisplayEvent::ModeApplied {
                         output: output.clone(),
                         result: run_wlr_randr(&output, &spec),

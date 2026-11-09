@@ -29,8 +29,9 @@ impl App {
 
         let mut modules: Vec<Box<dyn SettingsModule>> = vec![
             Box::new(modules::display::DisplayModule::new(ctx)),
-            Box::new(modules::env::EnvModule::new()),
             Box::new(modules::keybind::KeybindModule::new()),
+            Box::new(modules::labwc_display::LabwcDisplayModule::new()),
+            Box::new(modules::env::EnvModule::new()),
         ];
         for module in &mut modules {
             module.refresh();
@@ -227,11 +228,18 @@ impl eframe::App for App {
         i18n::set_current(self.lang);
         self.poll_events();
 
+        let mut requests = Vec::new();
+
         {
             let modules = &mut self.modules;
             let failures = &self.failures;
             let status = &mut self.status;
-            let mut module_ctx = ModuleCtx { failures, status };
+            let requests = &mut requests;
+            let mut module_ctx = ModuleCtx {
+                failures,
+                status,
+                requests,
+            };
             for module in modules {
                 module.update(ctx, &mut module_ctx);
             }
@@ -261,7 +269,12 @@ impl eframe::App for App {
             let modules = &mut self.modules;
             let failures = &self.failures;
             let status = &mut self.status;
-            let mut module_ctx = ModuleCtx { failures, status };
+            let requests = &mut requests;
+            let mut module_ctx = ModuleCtx {
+                failures,
+                status,
+                requests,
+            };
             if let Some(module) = modules.get_mut(current) {
                 module.ui(ui, &mut module_ctx);
             }
@@ -271,9 +284,25 @@ impl eframe::App for App {
             let modules = &mut self.modules;
             let failures = &self.failures;
             let status = &mut self.status;
-            let mut module_ctx = ModuleCtx { failures, status };
+            let requests = &mut requests;
+            let mut module_ctx = ModuleCtx {
+                failures,
+                status,
+                requests,
+            };
             for module in modules {
                 module.overlay(ctx, &mut module_ctx);
+            }
+        }
+
+        for request in requests {
+            if let Some(index) = self
+                .modules
+                .iter()
+                .position(|module| module.meta().id == request.target)
+            {
+                self.modules[index].on_message(&request.payload);
+                self.current = index;
             }
         }
 

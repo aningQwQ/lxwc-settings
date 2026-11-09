@@ -55,11 +55,11 @@ impl KeybindModule {
             pick_tab: KeyPickTab::Letters,
             error: None,
         };
-        module.reload(true);
+        module.reload_rc(true);
         module
     }
 
-    fn reload(&mut self, reset: bool) {
+    fn reload_rc(&mut self, reset: bool) {
         match config::read_optional(&self.path) {
             Ok((raw, exists)) => {
                 self.raw = raw;
@@ -349,126 +349,124 @@ impl SettingsModule for KeybindModule {
     }
 
     fn refresh(&mut self) {
-        self.reload(true);
+        self.reload_rc(true);
     }
 
     fn pending(&mut self) -> Vec<Task> {
-        if !self.exists {
-            return Vec::new();
-        }
+        let mut tasks = Vec::new();
 
-        let mut additions = Vec::new();
-        let mut remove_keys = Vec::new();
-        let mut changes = Vec::new();
+        if self.exists {
+            let mut additions = Vec::new();
+            let mut remove_keys = Vec::new();
+            let mut changes = Vec::new();
 
-        for deletion in &self.deletions {
-            let normalized = file::normalize_key(deletion);
-            let Some(entry) = self
-                .baseline
-                .iter()
-                .find(|entry| file::normalize_key(&entry.key) == normalized)
-            else {
-                continue;
-            };
-            changes.push(format!("-{}", entry.key));
-            Self::push_unique(&mut remove_keys, &entry.key);
-        }
-
-        for edit in &self.edits {
-            if self.edit_status(edit) == EditStatus::NoChange {
-                continue;
-            }
-
-            let target = file::normalize_key(&edit.key);
-            let target_entry = self
-                .baseline
-                .iter()
-                .find(|entry| file::normalize_key(&entry.key) == target);
-
-            if let Some(original) = &edit.original_key {
-                let original_norm = file::normalize_key(original);
-                if let Some(entry) = self
+            for deletion in &self.deletions {
+                let normalized = file::normalize_key(deletion);
+                let Some(entry) = self
                     .baseline
                     .iter()
-                    .find(|entry| file::normalize_key(&entry.key) == original_norm)
-                {
-                    if original_norm != target {
-                        changes.push(format!("{} → {}", entry.key, edit.key));
-                        Self::push_unique(&mut remove_keys, &entry.key);
+                    .find(|entry| file::normalize_key(&entry.key) == normalized)
+                else {
+                    continue;
+                };
+                changes.push(format!("-{}", entry.key));
+                Self::push_unique(&mut remove_keys, &entry.key);
+            }
+
+            for edit in &self.edits {
+                if self.edit_status(edit) == EditStatus::NoChange {
+                    continue;
+                }
+
+                let target = file::normalize_key(&edit.key);
+                let target_entry = self
+                    .baseline
+                    .iter()
+                    .find(|entry| file::normalize_key(&entry.key) == target);
+
+                if let Some(original) = &edit.original_key {
+                    let original_norm = file::normalize_key(original);
+                    if let Some(entry) = self
+                        .baseline
+                        .iter()
+                        .find(|entry| file::normalize_key(&entry.key) == original_norm)
+                    {
+                        if original_norm != target {
+                            changes.push(format!("{} → {}", entry.key, edit.key));
+                            Self::push_unique(&mut remove_keys, &entry.key);
+                        } else {
+                            changes.push(edit.key.clone());
+                        }
                     } else {
                         changes.push(edit.key.clone());
                     }
                 } else {
-                    changes.push(edit.key.clone());
+                    changes.push(format!("+{}", edit.key));
                 }
-            } else {
-                changes.push(format!("+{}", edit.key));
+
+                if target_entry.is_some() {
+                    Self::push_unique(&mut remove_keys, &edit.key);
+                }
+                additions.push(file::Addition {
+                    key: edit.key.clone(),
+                    attrs: edit.attrs.clone(),
+                    actions: edit.actions.clone(),
+                });
             }
 
-            if target_entry.is_some() {
-                Self::push_unique(&mut remove_keys, &edit.key);
+            if !changes.is_empty() {
+                match file::patch(&self.raw, &additions, &remove_keys) {
+                    Ok(patched) => {
+                        self.error = None;
+                        tasks.push(Task {
+                            id: TASK_ID.to_string(),
+                            module_id: MODULE_ID,
+                            title: crate::trf!("keybind_changes", changes.len()),
+                            detail: changes.join("; "),
+                            change_count: changes.len(),
+                            effects: vec![
+                                Effect::WriteFile {
+                                    path: self.path.clone(),
+                                    contents: patched,
+                                    expected: if self.exists {
+                                        Some(self.raw.clone())
+                                    } else {
+                                        None
+                                    },
+                                },
+                                Effect::RunCommand {
+                                    program: "sh".to_string(),
+                                    args: vec![
+                                        "-c".to_string(),
+                                        "labwc --reconfigure || pkill -HUP -x labwc".to_string(),
+                                    ],
+                                    best_effort: true,
+                                },
+                            ],
+                        });
+                    }
+                    Err(err) => {
+                        self.error = Some(err);
+                    }
+                }
             }
-            additions.push(file::Addition {
-                key: edit.key.clone(),
-                attrs: edit.attrs.clone(),
-                actions: edit.actions.clone(),
-            });
         }
 
-        if changes.is_empty() {
-            return Vec::new();
-        }
-
-        let patched = match file::patch(&self.raw, &additions, &remove_keys) {
-            Ok(patched) => patched,
-            Err(err) => {
-                self.error = Some(err);
-                return Vec::new();
-            }
-        };
-        self.error = None;
-
-        vec![Task {
-            id: TASK_ID.to_string(),
-            module_id: MODULE_ID,
-            title: crate::trf!("keybind_changes", changes.len()),
-            detail: changes.join("; "),
-            change_count: changes.len(),
-            effects: vec![
-                Effect::WriteFile {
-                    path: self.path.clone(),
-                    contents: patched,
-                    expected: if self.exists {
-                        Some(self.raw.clone())
-                    } else {
-                        None
-                    },
-                },
-                Effect::RunCommand {
-                    program: "sh".to_string(),
-                    args: vec![
-                        "-c".to_string(),
-                        "labwc --reconfigure || pkill -HUP -x labwc".to_string(),
-                    ],
-                    best_effort: true,
-                },
-            ],
-        }]
+        tasks
     }
 
     fn on_applied(&mut self, report: &ApplyReport) {
-        let succeeded = report.task_succeeded(MODULE_ID, TASK_ID);
-        let failed = report.task_failed(MODULE_ID, TASK_ID);
-        if !succeeded && !failed {
-            return;
-        }
-        self.reload(false);
-        if succeeded {
-            self.edits.clear();
-            self.deletions.clear();
-            self.form.editing_original = None;
-            self.form.key.clear();
-            self.form.error = None;
+        let keybind_ok = report.task_succeeded(MODULE_ID, TASK_ID);
+        let keybind_failed = report.task_failed(MODULE_ID, TASK_ID);
+        if keybind_ok || keybind_failed {
+            self.reload_rc(false);
+            if keybind_ok {
+                self.edits.clear();
+                self.deletions.clear();
+                self.form.editing_original = None;
+                self.form.key.clear();
+                self.form.error = None;
+            }
         }
     }
 
