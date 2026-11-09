@@ -30,6 +30,8 @@ pub struct OutputInfo {
     pub enabled: bool,
     pub current: Option<Mode>,
     pub modes: Vec<Mode>,
+    pub position: Option<(i32, i32)>,
+    pub scale: Option<f32>,
 }
 
 pub fn parse_spec(spec: &str) -> Option<Mode> {
@@ -114,6 +116,8 @@ pub fn parse(text: &str) -> Vec<OutputInfo> {
                 enabled: true,
                 current: None,
                 modes: Vec::new(),
+                position: None,
+                scale: None,
             });
             continue;
         }
@@ -125,6 +129,20 @@ pub fn parse(text: &str) -> Vec<OutputInfo> {
 
         if let Some(rest) = trimmed.strip_prefix("Enabled:") {
             item.enabled = rest.trim().eq_ignore_ascii_case("yes");
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix("Position:") {
+            if let Some((x, y)) = rest.trim().split_once(',') {
+                if let (Ok(x), Ok(y)) = (x.trim().parse(), y.trim().parse()) {
+                    item.position = Some((x, y));
+                }
+            }
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix("Scale:") {
+            item.scale = rest.trim().parse().ok();
             continue;
         }
 
@@ -190,6 +208,7 @@ mod tests {
     1920x1080 px, 60.000000 Hz
     1280x720 px, 59.939999 Hz
   Position: 0,0
+  Scale: 1.000000
 "#;
 
     #[test]
@@ -205,6 +224,8 @@ mod tests {
             height: 1080,
             refresh: 60.0,
         }));
+        assert_eq!(output.position, Some((0, 0)));
+        assert_eq!(output.scale, Some(1.0));
     }
 
     #[test]

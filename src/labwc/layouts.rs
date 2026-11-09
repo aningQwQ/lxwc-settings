@@ -96,7 +96,10 @@ mod tests {
     }
 
     #[test]
-    fn fallback_is_not_empty() {
-        assert!(!fallback().is_empty());
+    fn fallback_contains_common_layouts() {
+        let fallback = fallback();
+        assert_eq!(fallback.len(), 10);
+        assert!(fallback.iter().any(|layout| layout.code == "us"));
+        assert!(fallback.iter().any(|layout| layout.code == "cn"));
     }
 }

@@ -102,8 +102,7 @@ display_output	显示与输出
 display_scan_failed	扫描显示器失败：{}
 does_not_exist_and_will_be_created_when_applying	{} 不存在，应用时会自动创建。
 done_succeeded	执行完成：成功 {} 项
-dynamic_not_implemented	动态感知暂未实现
-dynamic_persist	动态感知（kanshi profile）
+dynamic_persist	动态多屏（kanshi）
 e_g_direction_left_combine_yes	例如 direction="left" combine="yes"
 e_g_w_c_s_t_w_return_print_xf86audiomute	例如 W-C-S-t、W-Return、Print、XF86AudioMute
 edit	编辑
@@ -417,3 +416,7 @@ fix_invalid_input_before_applying	请先修正无效输入再应用。
 points	采样点
 select_custom_profile_to_edit_curves	选择 Custom 加速配置后可编辑曲线。
 step	步进
+persist_dynamic_display	固化动态多屏配置
+dynamic_persist_help	将多屏规则写入 kanshi 配置；会话中需要运行 kanshi。
+kanshi_path	kanshi 配置：{}
+kanshi_profile_preview	kanshi 配置预览

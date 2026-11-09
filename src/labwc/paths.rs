@@ -25,3 +25,17 @@ pub fn autostart() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| config_dir().join("autostart"))
 }
+
+pub fn kanshi_config() -> PathBuf {
+    std::env::var_os("LXWC_KANSHI_CONFIG")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            std::env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .or_else(|| {
+                    std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config"))
+                })
+                .unwrap_or_else(|| PathBuf::from(".config"))
+                .join("kanshi/config")
+        })
+}

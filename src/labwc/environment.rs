@@ -133,3 +133,20 @@ mod tests {
         assert!(patched.contains("WLR_DRM_NO_MODIFIERS=1\n"));
     }
 }
+
+#[cfg(test)]
+mod comment_tests {
+    use super::*;
+
+    #[test]
+    fn multiple_new_variables_share_one_comment_block() {
+        let sets = BTreeMap::from([
+            ("A".to_string(), "1".to_string()),
+            ("B".to_string(), "2".to_string()),
+        ]);
+        let patched = patch("", &sets, &[]);
+        assert_eq!(patched.matches("# added by lxwc-settings").count(), 1);
+        assert!(patched.contains("A=1"));
+        assert!(patched.contains("B=2"));
+    }
+}

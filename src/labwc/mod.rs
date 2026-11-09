@@ -2,6 +2,7 @@ pub mod accel;
 pub mod actions;
 pub mod autostart;
 pub mod environment;
+pub mod kanshi;
 pub mod layouts;
 pub mod paths;
 pub mod rc_xml;

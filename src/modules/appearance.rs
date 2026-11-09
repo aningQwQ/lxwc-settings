@@ -169,12 +169,10 @@ impl SettingsModule for AppearanceModule {
             "appearance-decoration",
             &mut current,
             &["server".to_string(), "client".to_string()],
-            |value| {
-                if value == "client" {
-                    t("client_side_decoration").to_string()
-                } else {
-                    t("server_side_decoration").to_string()
-                }
+            |value| match value {
+                "client" => t("client_side_decoration").to_string(),
+                "server" => t("server_side_decoration").to_string(),
+                other => other.to_string(),
             },
             &mut |value| self.rc.set("/labwc_config/core/decoration", value),
         );
@@ -189,12 +187,10 @@ impl SettingsModule for AppearanceModule {
             "appearance-maximized-decoration",
             &mut current,
             &["titlebar".to_string(), "none".to_string()],
-            |value| {
-                if value == "none" {
-                    t("none").to_string()
-                } else {
-                    t("titlebar").to_string()
-                }
+            |value| match value {
+                "none" => t("none").to_string(),
+                "titlebar" => t("titlebar").to_string(),
+                other => other.to_string(),
             },
             &mut |value| {
                 self.rc
