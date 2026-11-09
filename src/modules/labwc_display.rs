@@ -12,7 +12,7 @@ use crate::modules::{Category, ModuleCtx, ModuleMeta, ModulePayload, SettingsMod
 use crate::ui::theme;
 use crate::wlr::{self, Mode, OutputInfo};
 
-pub const MODULE_ID: &str = "labwc-display";
+pub const MODULE_ID: &str = crate::modules::DEFAULT_DISPLAY_MODULE_ID;
 const TASK_ID: &str = "display-default";
 const DYNAMIC_TASK_ID: &str = "display-dynamic";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

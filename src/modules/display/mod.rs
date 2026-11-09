@@ -1,16 +1,17 @@
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 use eframe::egui::{self, RichText};
 
 use crate::core::model::{ApplyReport, Task};
 use crate::i18n::t;
-use crate::modules::labwc_display::MODULE_ID as LABWC_DISPLAY_MODULE_ID;
 use crate::modules::{
     Category, ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule,
+    DEFAULT_DISPLAY_MODULE_ID,
 };
 use crate::ui::theme;
-use crate::wlr::{self, Mode, OutputInfo};
+use crate::wlr::worker::{self, Event as DisplayEvent, Request as DisplayRequest};
+use crate::wlr::{Mode, OutputInfo};
 
 const WATCHDOG_SECONDS: u64 = 15;
 
@@ -41,24 +42,6 @@ impl Watchdog {
     }
 }
 
-enum DisplayRequest {
-    Scan,
-    ApplyMode { output: String, spec: String },
-    RevertMode { output: String, spec: String },
-}
-
-enum DisplayEvent {
-    Outputs(Result<Vec<OutputInfo>, String>),
-    ModeApplied {
-        output: String,
-        result: Result<(), String>,
-    },
-    ModeReverted {
-        output: String,
-        result: Result<(), String>,
-    },
-}
-
 pub struct DisplayModule {
     tx: Sender<DisplayRequest>,
     rx: Receiver<DisplayEvent>,
@@ -74,7 +57,11 @@ pub struct DisplayModule {
 
 impl DisplayModule {
     pub fn new(ui_ctx: &egui::Context) -> Self {
-        let (tx, rx) = spawn_worker(ui_ctx.clone());
+        let repaint = {
+            let ctx = ui_ctx.clone();
+            move || ctx.request_repaint()
+        };
+        let (tx, rx) = worker::spawn(repaint);
         Self {
             tx,
             rx,
@@ -547,37 +534,10 @@ impl SettingsModule for DisplayModule {
             let spec = watchdog.mode.spec();
             self.watchdog = None;
             ctx.requests.push(ModuleRequest {
-                target: LABWC_DISPLAY_MODULE_ID,
+                target: DEFAULT_DISPLAY_MODULE_ID,
                 payload: ModulePayload::DisplayDefault { output, spec },
             });
             ctx.info(t("display_default_handed_off"));
         }
     }
-}
-
-fn spawn_worker(ui_ctx: egui::Context) -> (Sender<DisplayRequest>, Receiver<DisplayEvent>) {
-    let (request_tx, request_rx) = mpsc::channel::<DisplayRequest>();
-    let (event_tx, event_rx) = mpsc::channel::<DisplayEvent>();
-
-    let _ = std::thread::Builder::new()
-        .name("lxwc-display".to_string())
-        .spawn(move || {
-            while let Ok(request) = request_rx.recv() {
-                let event = match request {
-                    DisplayRequest::Scan => DisplayEvent::Outputs(wlr::scan()),
-                    DisplayRequest::ApplyMode { output, spec } => DisplayEvent::ModeApplied {
-                        output: output.clone(),
-                        result: wlr::set_mode(&output, &spec),
-                    },
-                    DisplayRequest::RevertMode { output, spec } => DisplayEvent::ModeReverted {
-                        result: wlr::set_mode(&output, &spec),
-                        output,
-                    },
-                };
-                let _ = event_tx.send(event);
-                ui_ctx.request_repaint();
-            }
-        });
-
-    (request_tx, event_rx)
 }

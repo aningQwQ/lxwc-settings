@@ -1,3 +1,5 @@
+pub mod worker;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mode {
     pub width: u32,

@@ -7,6 +7,7 @@ use crate::i18n::t;
 
 pub const RC_XML_TASK_ID: &str = "rc-xml";
 pub const ENVIRONMENT_TASK_ID: &str = "environment";
+pub const DEFAULT_DISPLAY_MODULE_ID: &str = "labwc-display";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConfigTarget {
