@@ -723,8 +723,3 @@ const MEDIA_KEYS: [(&str, &str); 22] = [
     ("batt", "XF86Battery"),
     ("rec", "XF86AudioRecord"),
 ];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-}
