@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::process::Command as ProcessCommand;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Instant;
@@ -6,7 +5,6 @@ use std::time::Instant;
 use eframe::egui;
 
 use super::config;
-use super::env_file;
 use super::keybinds;
 use super::model::{ApplyReport, Baseline, OutputInfo, Task, TaskAction, TaskResult};
 use super::output;
@@ -95,41 +93,23 @@ fn apply_tasks(tasks: &[Task]) -> ApplyReport {
     let started = Instant::now();
     let mut report = ApplyReport::default();
 
-    let env_tasks: Vec<&Task> = tasks
+    let file_tasks: Vec<&Task> = tasks
         .iter()
-        .filter(|task| {
-            matches!(
-                task.action,
-                TaskAction::EnvSet { .. } | TaskAction::EnvUnset { .. }
-            )
-        })
+        .filter(|task| matches!(task.action, TaskAction::WriteFile { .. }))
         .collect();
 
-    if !env_tasks.is_empty() {
-        let mut sets = BTreeMap::new();
-        let mut unsets = Vec::new();
-        for task in &env_tasks {
-            match &task.action {
-                TaskAction::EnvSet { key, value } => {
-                    sets.insert(key.clone(), value.clone());
-                }
-                TaskAction::EnvUnset { key } => unsets.push(key.clone()),
-                _ => {}
-            }
-        }
-
-        let path = config::environment_path();
-        let outcome = (|| -> Result<(), String> {
-            let (raw, _) = config::read_optional(&path)?;
-            let patched = env_file::patch(&raw, &sets, &unsets);
-            config::atomic_write(&path, &patched)
-        })();
-
-        for task in &env_tasks {
+    for task in &file_tasks {
+        if let TaskAction::WriteFile {
+            path,
+            contents,
+            expected,
+        } = &task.action
+        {
+            let outcome = config::write_file_if_unchanged(path, expected.as_deref(), contents);
             report.results.push(result_for(task, &outcome));
-        }
-        if outcome.is_ok() {
-            report.files.push(path.display().to_string());
+            if outcome.is_ok() {
+                report.files.push(path.display().to_string());
+            }
         }
     }
 
@@ -199,6 +179,7 @@ fn result_for(task: &Task, outcome: &Result<(), String>) -> TaskResult {
         id: task.id.clone(),
         module: task.module,
         title: task.title.clone(),
+        change_count: task.change_count,
         ok: outcome.is_ok(),
         error: outcome.as_ref().err().cloned(),
     }

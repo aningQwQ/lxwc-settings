@@ -1,6 +1,5 @@
 use std::path::{Path, PathBuf};
 
-use super::env_file;
 use super::keybinds;
 use super::model::Baseline;
 
@@ -18,12 +17,6 @@ pub fn rc_path() -> PathBuf {
         .unwrap_or_else(|| config_dir().join("rc.xml"))
 }
 
-pub fn environment_path() -> PathBuf {
-    std::env::var_os("LXWC_ENVIRONMENT")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| config_dir().join("environment"))
-}
-
 pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok((text, true)),
@@ -34,18 +27,29 @@ pub fn read_optional(path: &Path) -> Result<(String, bool), String> {
 
 pub fn load_baseline() -> Result<Baseline, String> {
     let rc_path = rc_path();
-    let env_path = environment_path();
     let (rc_raw, rc_exists) = read_optional(&rc_path)?;
-    let (env_raw, env_exists) = read_optional(&env_path)?;
     let keybinds = keybinds::parse(&rc_raw)?;
     Ok(Baseline {
         rc_path,
-        env_path,
         rc_exists,
-        env_exists,
-        environment: env_file::parse_active(&env_raw),
         keybinds,
     })
+}
+
+pub fn write_file_if_unchanged(
+    path: &Path,
+    expected: Option<&str>,
+    contents: &str,
+) -> Result<(), String> {
+    let (current, exists) = read_optional(path)?;
+    let changed = match expected {
+        Some(expected) => !exists || current != expected,
+        None => exists,
+    };
+    if changed {
+        return Err(crate::trf!("file_changed_externally", path.display()));
+    }
+    atomic_write(path, contents)
 }
 
 pub fn atomic_write(path: &Path, contents: &str) -> Result<(), String> {
@@ -85,4 +89,55 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     let mut name = path.as_os_str().to_owned();
     name.push(suffix);
     PathBuf::from(name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_path() -> (PathBuf, PathBuf) {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("lxwc-config-test-{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("config.txt");
+        (dir, path)
+    }
+
+    #[test]
+    fn creates_file_when_expected_missing() {
+        let (dir, path) = temp_path();
+        write_file_if_unchanged(&path, None, "new").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn rejects_external_change() {
+        let (dir, path) = temp_path();
+        std::fs::write(&path, "external").unwrap();
+        assert!(write_file_if_unchanged(&path, Some("snapshot"), "new").is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "external");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn rejects_created_file_when_expected_missing() {
+        let (dir, path) = temp_path();
+        std::fs::write(&path, "external").unwrap();
+        assert!(write_file_if_unchanged(&path, None, "new").is_err());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn updates_when_snapshot_matches() {
+        let (dir, path) = temp_path();
+        std::fs::write(&path, "old").unwrap();
+        write_file_if_unchanged(&path, Some("old"), "new").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+        std::fs::remove_dir_all(dir).ok();
+    }
 }

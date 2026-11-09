@@ -42,11 +42,12 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     .into_iter()
                     .filter(|module| module.category() == category)
                 {
-                    let count = app
+                    let count: usize = app
                         .pending
                         .iter()
                         .filter(|task| task.module == module)
-                        .count();
+                        .map(|task| task.change_count)
+                        .sum();
                     let text = if count > 0 {
                         format!("{}   ({})", module.title(), count)
                     } else {

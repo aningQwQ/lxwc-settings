@@ -67,6 +67,7 @@ editing_other_keybind_attributes_are_preserved	Editing: {} (other keybind attrib
 enabled	Enabled
 enter_a_key_combination_e_g_w_c_s_t	Enter a key combination, e.g. W-C-S-t
 enter_name_command_in_their_dedicated_fields	Enter name / command in their dedicated fields
+environment_changes	Environment variables ({} changes)
 environment_system	Environment / System
 environment_tweaks	Environment Tweaks
 exactly_one_main_key_is_required_use_uppercase_w_c_a_s_for_modifiers	Exactly one main key is required; use uppercase W / C / A / S for modifiers
@@ -89,6 +90,7 @@ failed_to_replace	Failed to replace {}: {}
 failed_to_run_wlr_randr	Failed to run wlr-randr: {}
 failed_to_switch_mode	Failed to switch mode: {}
 failed_to_write_temporary_file	Failed to write temporary file {}: {}
+file_changed_externally	The file changed on disk; rescan and try again
 files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry	Files are backed up as *.lxwc.bak before writing. Failed tasks stay queued for retry.
 force_linear_buffers	Force linear buffers
 from	From {}

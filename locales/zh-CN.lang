@@ -67,6 +67,7 @@ editing_other_keybind_attributes_are_preserved	正在编辑：{}（键位上的�
 enabled	已启用
 enter_a_key_combination_e_g_w_c_s_t	请输入按键组合，例如 W-C-S-t
 enter_name_command_in_their_dedicated_fields	name / command 请在专用输入框填写
+environment_changes	环境变量（{} 项变更）
 environment_system	环境/系统模块
 environment_tweaks	环境变量魔改
 exactly_one_main_key_is_required_use_uppercase_w_c_a_s_for_modifiers	只能包含一个主键；修饰键请用大写 W / C / A / S
@@ -89,6 +90,7 @@ failed_to_replace	替换 {} 失败：{}
 failed_to_run_wlr_randr	无法执行 wlr-randr：{}
 failed_to_switch_mode	切换失败：{}
 failed_to_write_temporary_file	写入临时文件 {} 失败：{}
+file_changed_externally	文件已被外部修改，请重新扫描后再试
 files_are_backed_up_as_lxwc_bak_before_writing_failed_tasks_stay_queued_for_retry	写入前会备份为 *.lxwc.bak；失败的任务会留在队列中等待重试。
 force_linear_buffers	强制线性显存
 from	原键 {}

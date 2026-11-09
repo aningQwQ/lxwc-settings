@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use crate::i18n::t;
@@ -184,21 +183,16 @@ impl EditStatus {
 #[derive(Clone, Debug, Default)]
 pub struct Baseline {
     pub rc_path: PathBuf,
-    pub env_path: PathBuf,
     pub rc_exists: bool,
-    pub env_exists: bool,
-    pub environment: BTreeMap<String, String>,
     pub keybinds: Vec<KeybindEntry>,
 }
 
 #[derive(Clone, Debug)]
 pub enum TaskAction {
-    EnvSet {
-        key: String,
-        value: String,
-    },
-    EnvUnset {
-        key: String,
+    WriteFile {
+        path: PathBuf,
+        contents: String,
+        expected: Option<String>,
     },
     KeybindAdd {
         key: String,
@@ -217,6 +211,7 @@ pub struct Task {
     pub module: ModuleKind,
     pub title: String,
     pub detail: String,
+    pub change_count: usize,
     pub action: TaskAction,
 }
 
@@ -225,6 +220,7 @@ pub struct TaskResult {
     pub id: String,
     pub module: ModuleKind,
     pub title: String,
+    pub change_count: usize,
     pub ok: bool,
     pub error: Option<String>,
 }
@@ -239,42 +235,21 @@ pub struct ApplyReport {
 
 impl ApplyReport {
     pub fn success_count(&self) -> usize {
-        self.results.iter().filter(|result| result.ok).count()
+        self.results
+            .iter()
+            .filter(|result| result.ok)
+            .map(|result| result.change_count)
+            .sum()
     }
 
     pub fn failure_count(&self) -> usize {
-        self.results.iter().filter(|result| !result.ok).count()
+        self.results
+            .iter()
+            .filter(|result| !result.ok)
+            .map(|result| result.change_count)
+            .sum()
     }
 }
-
-pub struct ManagedEnv {
-    pub key: &'static str,
-    pub label: &'static str,
-    pub help: &'static str,
-}
-
-impl ManagedEnv {
-    pub fn label(&self) -> &'static str {
-        t(self.label)
-    }
-
-    pub fn help(&self) -> &'static str {
-        t(self.help)
-    }
-}
-
-pub const MANAGED_ENV: [ManagedEnv; 2] = [
-    ManagedEnv {
-        key: "WLR_DRM_NO_MODIFIERS",
-        label: "force_linear_buffers",
-        help: "avoid_black_screens_or_corruption_with_some_streaming_and_virtual_outputs_caused_by_gpu_modifiers",
-    },
-    ManagedEnv {
-        key: "WLR_NO_HARDWARE_CURSORS",
-        label: "disable_hardware_cursors",
-        help: "use_a_software_cursor_to_fix_disappearing_or_ghosting_cursors_during_remote_streaming",
-    },
-];
 
 pub const ACTION_SUGGESTIONS: &[&str] = &[
     "Execute",

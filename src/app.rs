@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use eframe::egui;
@@ -7,7 +7,7 @@ use crate::core::keybinds;
 use crate::core::model::*;
 use crate::core::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::i18n::{self, t, Lang};
-use crate::modules;
+use crate::modules::{self, SettingsModule};
 use crate::ui::{sidebar, status_bar, theme};
 
 pub const WATCHDOG_SECONDS: u64 = 15;
@@ -132,7 +132,7 @@ pub struct App {
     pub scanning: bool,
     pub current: ModuleKind,
     pub lang: Lang,
-    pub env_desired: BTreeMap<&'static str, Option<String>>,
+    env: Box<dyn SettingsModule>,
     pub keybind_form: KeybindForm,
     pub keybind_edits: Vec<KeybindEdit>,
     pub keybind_deletions: Vec<String>,
@@ -158,6 +158,10 @@ impl App {
     pub fn new(ctx: &egui::Context) -> Self {
         let lang = i18n::initial();
         i18n::set_current(lang);
+
+        let mut env: Box<dyn SettingsModule> = Box::new(modules::env::EnvModule::new());
+        env.refresh();
+
         let worker = WorkerHandle::spawn(ctx.clone());
         let app = Self {
             worker,
@@ -167,7 +171,7 @@ impl App {
             scanning: true,
             current: ModuleKind::Display,
             lang,
-            env_desired: BTreeMap::new(),
+            env,
             keybind_form: KeybindForm::default(),
             keybind_edits: Vec::new(),
             keybind_deletions: Vec::new(),
@@ -269,6 +273,7 @@ impl App {
 
     fn on_applied(&mut self, report: ApplyReport, baseline: Result<Baseline, String>) {
         self.applying = false;
+        self.env.on_applied(&report);
         self.failures.clear();
         for result in &report.results {
             if !result.ok {
@@ -359,21 +364,10 @@ impl App {
 
     fn adopt_baseline(&mut self, baseline: Baseline, reset: bool) {
         if reset || self.baseline.is_none() {
-            self.env_desired.clear();
-            for item in MANAGED_ENV {
-                self.env_desired
-                    .insert(item.key, baseline.environment.get(item.key).cloned());
-            }
             self.keybind_edits.clear();
             self.keybind_deletions.clear();
             self.keybind_form = KeybindForm::default();
             self.failures.clear();
-        } else {
-            for item in MANAGED_ENV {
-                self.env_desired
-                    .entry(item.key)
-                    .or_insert_with(|| baseline.environment.get(item.key).cloned());
-            }
         }
         self.baseline = Some(baseline);
         self.sync_selected_mode();
@@ -393,39 +387,10 @@ impl App {
     }
 
     pub fn build_tasks(&self) -> Vec<Task> {
+        let mut tasks = self.env.pending();
         let Some(baseline) = &self.baseline else {
-            return Vec::new();
+            return tasks;
         };
-        let mut tasks = Vec::new();
-
-        for item in MANAGED_ENV {
-            let desired = self.env_desired.get(item.key).cloned().flatten();
-            let current = baseline.environment.get(item.key).cloned();
-            if desired == current {
-                continue;
-            }
-            match desired {
-                Some(value) => tasks.push(Task {
-                    id: format!("env:{}={}", item.key, value),
-                    module: ModuleKind::Environment,
-                    title: crate::trf!("set", item.key, value),
-                    detail: crate::trf!("takes_effect_after_re_login", item.label(), item.help()),
-                    action: TaskAction::EnvSet {
-                        key: item.key.to_string(),
-                        value,
-                    },
-                }),
-                None => tasks.push(Task {
-                    id: format!("env:{}", item.key),
-                    module: ModuleKind::Environment,
-                    title: crate::trf!("remove_environment_variable", item.key),
-                    detail: crate::trf!("delete_from_the_environment_file", item.key),
-                    action: TaskAction::EnvUnset {
-                        key: item.key.to_string(),
-                    },
-                }),
-            }
-        }
 
         for deletion in &self.keybind_deletions {
             let normalized = keybinds::normalize_key(deletion);
@@ -441,6 +406,7 @@ impl App {
                 module: ModuleKind::Keybind,
                 title: crate::trf!("delete_shortcut", entry.key),
                 detail: entry.summary(),
+                change_count: 1,
                 action: TaskAction::KeybindRemove {
                     key: entry.key.clone(),
                 },
@@ -473,6 +439,7 @@ impl App {
                             module: ModuleKind::Keybind,
                             title: crate::trf!("delete_shortcut", entry.key),
                             detail: entry.summary(),
+                            change_count: 1,
                             action: TaskAction::KeybindRemove {
                                 key: entry.key.clone(),
                             },
@@ -495,6 +462,7 @@ impl App {
                 } else {
                     t("write_a_new_key_binding").to_string()
                 },
+                change_count: 1,
                 action: TaskAction::KeybindAdd {
                     key: edit.key.clone(),
                     attrs: edit.attrs.clone(),
@@ -512,6 +480,7 @@ impl App {
             return;
         }
         self.confirm_open = false;
+        self.env.refresh();
         self.reset_on_baseline = true;
         self.reset_modes_on_scan = true;
         self.scanning = true;
@@ -906,24 +875,12 @@ impl App {
         }
     }
 
-    pub fn env_value(&self, key: &str) -> Option<String> {
-        self.env_desired.get(key).cloned().flatten()
-    }
-
-    pub fn set_env(&mut self, key: &'static str, enabled: bool) {
-        self.env_desired
-            .insert(key, if enabled { Some("1".to_string()) } else { None });
-    }
-
-    pub fn failure_for(&self, task_id: &str) -> Option<&String> {
-        self.failures.get(task_id)
-    }
-
     fn confirm_dialog(&mut self, ctx: &egui::Context) {
         if !self.confirm_open {
             return;
         }
         let tasks = self.pending.clone();
+        let change_count: usize = tasks.iter().map(|task| task.change_count).sum();
         let mut cancel = false;
         let mut go = false;
 
@@ -933,7 +890,7 @@ impl App {
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 ui.set_min_width(520.0);
-                ui.label(crate::trf!("about_to_apply_changes", tasks.len()));
+                ui.label(crate::trf!("about_to_apply_changes", change_count));
                 ui.add_space(4.0);
                 egui::ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
                     for (index, task) in tasks.iter().enumerate() {
@@ -1108,7 +1065,7 @@ impl eframe::App for App {
                 ModuleKind::Environment => {
                     egui::ScrollArea::vertical()
                         .auto_shrink([false, false])
-                        .show(ui, |ui| modules::env::show(self, ui));
+                        .show(ui, |ui| self.env.ui(ui, &self.failures));
                 }
             }
         });

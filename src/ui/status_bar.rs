@@ -22,12 +22,13 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 ui.label(RichText::new(t("ready")).small().weak());
             }
 
-            let pending = app.pending.len();
-            let failures = app
+            let pending: usize = app.pending.iter().map(|task| task.change_count).sum();
+            let failures: usize = app
                 .pending
                 .iter()
                 .filter(|task| app.failures.contains_key(&task.id))
-                .count();
+                .map(|task| task.change_count)
+                .sum();
             let applying = app.applying;
             let has_report = app.report.is_some();
 
