@@ -150,6 +150,7 @@ LXWC_TEST_RC="$HOME/.config/labwc/rc.xml" cargo test real_config
 ## 文档
 
 - 未完成工作：[`doc/TODO.md`](doc/TODO.md)
+- 开发守则：[`doc/守则.md`](doc/守则.md)
 - 翻译文件：[`locales/`](locales/)
 
 ## 许可证
