@@ -47,6 +47,72 @@ pub fn profile(
     Some(format!("profile {{\n{}\n}}", rules.join("\n")))
 }
 
+pub fn parse_profile(block: &str) -> Option<(String, String)> {
+    for line in block.lines() {
+        let tokens = line.split_whitespace().collect::<Vec<_>>();
+        if tokens.first().copied() != Some("output") {
+            continue;
+        }
+        let name = tokens.get(1)?.trim_matches('"');
+        let mode_index = tokens.iter().position(|token| *token == "mode")?;
+        let mode = tokens.get(mode_index + 1)?;
+        return Some((name.to_string(), mode.to_string()));
+    }
+    None
+}
+
+pub fn managed_block(raw: &str) -> Option<String> {
+    let mut block = Vec::new();
+    let mut inside = false;
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed == BEGIN {
+            inside = true;
+            block.clear();
+            continue;
+        }
+        if trimmed == END {
+            if inside {
+                let text = block.join("\n");
+                return (!text.trim().is_empty()).then_some(text);
+            }
+            inside = false;
+            block.clear();
+            continue;
+        }
+        if inside {
+            block.push(line.to_string());
+        }
+    }
+    None
+}
+
+pub fn remove_block(raw: &str) -> String {
+    let mut kept = String::new();
+    let mut skipping = false;
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed == BEGIN {
+            skipping = true;
+            continue;
+        }
+        if skipping {
+            if trimmed == END {
+                skipping = false;
+            }
+            continue;
+        }
+        kept.push_str(line);
+        kept.push('\n');
+    }
+    let trimmed = kept.trim_end_matches('\n');
+    if trimmed.is_empty() {
+        String::new()
+    } else {
+        format!("{trimmed}\n")
+    }
+}
+
 pub fn contents(raw: &str, profile: &str) -> String {
     let block = format!("{BEGIN}\n{profile}\n{END}");
 
@@ -150,6 +216,26 @@ mod tests {
         );
         assert!(profile.contains("output \"HDMI-A-1\" mode 2560x1440@59.950000Hz position 1920,0"));
         assert!(profile.contains("output \"DP-2\" disable"));
+    }
+
+    #[test]
+    fn parses_profile_output_and_mode() {
+        let profile =
+            "profile {\n    output \"HDMI-A-1\" mode 1920x1080@60.000000Hz position 0,0\n}";
+        assert_eq!(
+            parse_profile(profile),
+            Some(("HDMI-A-1".to_string(), "1920x1080@60.000000Hz".to_string()))
+        );
+        assert!(parse_profile("profile {\n    output \"eDP-1\" disable\n}").is_none());
+    }
+
+    #[test]
+    fn reads_and_removes_managed_block() {
+        let text = contents("profile \"other\" {\n}\n", "profile {\n}");
+        assert_eq!(managed_block(&text).as_deref(), Some("profile {\n}"));
+        let removed = remove_block(&text);
+        assert_eq!(removed, "profile \"other\" {\n}\n");
+        assert!(managed_block(&removed).is_none());
     }
 
     #[test]

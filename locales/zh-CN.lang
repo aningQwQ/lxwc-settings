@@ -87,7 +87,6 @@ current	（当前）
 current_file	文件现状：{}
 current_mode	当前模式：{}
 default_display_configuration	默认显示配置
-default_display_persisted	已固化到 autostart
 default_display_subtitle	把当前临时分辨率固化为登录默认。
 delete	删除
 delete_from_the_environment_file	从 environment 文件中删除 {}
@@ -279,7 +278,6 @@ undo_delete	撤销删除
 unknown	未知
 update	更新
 use_a_software_cursor_to_fix_disappearing_or_ghosting_cursors_during_remote_streaming	改用软件光标，修复远程串流时鼠标消失或残影。
-use_current_mode	使用当前模式
 use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_return_space_left_print_f12_xf86audiomute_labwc_does_not_support_multi_step_key_sequences	修饰键用 W / C / A / S；主键写 XKB keysym 名称。常见：Return、space、Left、Print、F12、XF86AudioMute。labwc 不支持多段按键序列。
 vol	音量+
 vol_2	音量-
@@ -426,3 +424,16 @@ persist_dynamic_display	固化动态多屏配置
 dynamic_persist_help	将多屏规则写入 kanshi 配置；会话中需要运行 kanshi。
 kanshi_path	kanshi 配置：{}
 kanshi_profile_preview	kanshi 配置预览
+output_and_mode	输出与模式
+reload_and_rescan	刷新文件并重扫
+current_written	当前配置文件
+current_autostart	autostart 内容
+current_kanshi	kanshi 内容
+will_write	将写入
+will_update	应用后将更新当前配置。
+up_to_date	当前配置与选择一致。
+clear_persisted_display	清除当前配置
+clear_persisted_display_help	移除由程序管理的显示配置块。
+will_clear_persisted_display	应用后将清除由程序管理的显示配置。
+do_not_persist	不设置默认显示
+not_persisting_help	不会写入 autostart 或 kanshi 显示配置。

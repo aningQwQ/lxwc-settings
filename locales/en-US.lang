@@ -87,7 +87,6 @@ current	 (current)
 current_file	Current file: {}
 current_mode	Current mode: {}
 default_display_configuration	Default display configuration
-default_display_persisted	Persisted to autostart
 default_display_subtitle	Persist the current temporary mode for the next login.
 delete	Delete
 delete_from_the_environment_file	Delete {} from the environment file
@@ -279,7 +278,6 @@ undo_delete	Undo delete
 unknown	Unknown
 update	Update
 use_a_software_cursor_to_fix_disappearing_or_ghosting_cursors_during_remote_streaming	Use a software cursor to fix disappearing or ghosting cursors during remote streaming.
-use_current_mode	Use current mode
 use_w_c_a_s_for_modifiers_and_an_xkb_keysym_name_for_the_key_common_keysyms_return_space_left_print_f12_xf86audiomute_labwc_does_not_support_multi_step_key_sequences	Use W / C / A / S for modifiers and an XKB keysym name for the key. Common keysyms: Return, space, Left, Print, F12, XF86AudioMute. labwc does not support multi-step key sequences.
 vol	Vol+
 vol_2	Vol-
@@ -426,3 +424,16 @@ persist_dynamic_display	Persist dynamic display profile
 dynamic_persist_help	Writes a multi-output profile to the kanshi config. Kanshi must be running in the session.
 kanshi_path	kanshi config: {}
 kanshi_profile_preview	kanshi profile preview
+output_and_mode	Output and mode
+reload_and_rescan	Reload files and rescan
+current_written	Current configuration files
+current_autostart	autostart contents
+current_kanshi	kanshi contents
+will_write	Will write
+will_update	Applying will update the current configuration.
+up_to_date	The current configuration matches the selection.
+clear_persisted_display	Clear current configuration
+clear_persisted_display_help	Remove the managed display block.
+will_clear_persisted_display	Applying will clear the managed display configuration.
+do_not_persist	Do not persist a display
+not_persisting_help	No autostart or kanshi display block will be written.
