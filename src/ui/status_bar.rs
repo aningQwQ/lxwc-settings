@@ -55,8 +55,8 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 if ui
                     .add_enabled(!applying, egui::Button::new(t("重新扫描", "Rescan")))
                     .on_hover_text(t(
-                        "清空待执行队列并重新读取 rc.xml / environment",
-                        "Clear the pending queue and reload rc.xml / environment",
+                        "重置队列并恢复默认",
+                        "Reset queue and restore defaults",
                     ))
                     .clicked()
                 {

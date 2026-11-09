@@ -151,6 +151,7 @@ pub struct App {
     pub report: Option<ApplyReport>,
     pub report_open: bool,
     reset_on_baseline: bool,
+    reset_modes_on_scan: bool,
 }
 
 impl App {
@@ -185,6 +186,7 @@ impl App {
             report: None,
             report_open: false,
             reset_on_baseline: true,
+            reset_modes_on_scan: false,
         };
         app.worker.send(WorkerRequest::Refresh);
         app.worker.send(WorkerRequest::ScanOutputs);
@@ -237,6 +239,7 @@ impl App {
 
     fn on_outputs(&mut self, result: Result<Vec<OutputInfo>, String>) {
         self.scanning = false;
+        let reset_modes = std::mem::take(&mut self.reset_modes_on_scan);
         match result {
             Ok(outputs) => {
                 self.outputs_error = None;
@@ -253,6 +256,9 @@ impl App {
                         .find(|item| item.enabled)
                         .or_else(|| self.outputs.first())
                         .map(|item| item.name.clone());
+                    self.selected_mode = None;
+                }
+                if reset_modes {
                     self.selected_mode = None;
                 }
                 self.sync_selected_mode();
@@ -547,21 +553,32 @@ impl App {
         }
         self.confirm_open = false;
         self.reset_on_baseline = true;
+        self.reset_modes_on_scan = true;
+        self.scanning = true;
+        self.reset_mode_selection();
         self.status = Some(StatusMessage::info(t(
-            "正在重新读取配置文件…",
+            "正在重新读取配置…",
             "Reloading configuration…",
         )));
         self.worker.send(WorkerRequest::Refresh);
-        if !self.scanning {
-            self.scanning = true;
-            self.worker.send(WorkerRequest::ScanOutputs);
-        }
+        self.worker.send(WorkerRequest::ScanOutputs);
     }
 
     pub fn rescan_outputs(&mut self) {
         self.scanning = true;
         self.outputs_error = None;
+        self.reset_modes_on_scan = true;
+        self.reset_mode_selection();
+        self.status = Some(StatusMessage::info(t(
+            "正在重新扫描…",
+            "Rescanning…",
+        )));
         self.worker.send(WorkerRequest::ScanOutputs);
+    }
+
+    fn reset_mode_selection(&mut self) {
+        self.selected_mode = None;
+        self.sync_selected_mode();
     }
 
     pub fn execute_pending(&mut self) {

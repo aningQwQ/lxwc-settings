@@ -13,7 +13,14 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
     ui.add_space(8.0);
 
     ui.horizontal(|ui| {
-        if ui.button(t("重新扫描显示器", "Rescan displays")).clicked() {
+        if ui
+            .button(t("重新扫描显示器", "Rescan displays"))
+            .on_hover_text(t(
+                "恢复当前分辨率",
+                "Restore current mode",
+            ))
+            .clicked()
+        {
             app.rescan_outputs();
         }
         if app.scanning {
