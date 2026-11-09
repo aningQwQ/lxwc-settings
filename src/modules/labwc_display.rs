@@ -84,12 +84,17 @@ impl LabwcDisplayModule {
         self.selection_from_config();
     }
 
+    fn saved_default(&self) -> Option<(String, Mode)> {
+        let (output, spec) = autostart::managed_block(&self.autostart_raw)
+            .and_then(|block| autostart::parse_command(&block))?;
+        let mode = wlr::parse_spec(&spec)?;
+        Some((output, mode))
+    }
+
     fn selection_from_config(&mut self) {
-        let parsed = autostart::managed_block(&self.autostart_raw)
-            .and_then(|block| autostart::parse_command(&block));
-        if let Some((output, spec)) = parsed {
+        if let Some((output, mode)) = self.saved_default() {
             self.selected_output = Some(output);
-            self.selected_mode = wlr::parse_spec(&spec);
+            self.selected_mode = Some(mode);
         } else {
             self.selected_output = None;
             self.selected_mode = None;
@@ -156,10 +161,7 @@ impl LabwcDisplayModule {
                 output.modes.push(mode);
             }
         } else {
-            self.selected_mode = output
-                .current
-                .clone()
-                .or_else(|| output.modes.first().cloned());
+            self.selected_mode = output.modes.first().cloned();
         }
     }
 
@@ -333,7 +335,7 @@ impl SettingsModule for LabwcDisplayModule {
 
                 if let Some(output) = self.selected_output_info() {
                     let modes = output.modes.clone();
-                    let current_mode = output.current.clone();
+                    let saved = self.saved_default();
                     let selected_mode = self.selected_mode.clone();
                     let mode_combo_text = selected_mode
                         .as_ref()
@@ -349,9 +351,12 @@ impl SettingsModule for LabwcDisplayModule {
                             .show_ui(ui, |ui| {
                                 for mode in &modes {
                                     let mut label = mode.label();
-                                    if current_mode
+                                    if saved
                                         .as_ref()
-                                        .map(|current| current.same_mode(mode))
+                                        .map(|(saved_output, saved_mode)| {
+                                            saved_output == &output.name
+                                                && saved_mode.same_mode(mode)
+                                        })
                                         .unwrap_or(false)
                                     {
                                         label.push_str(t("current"));
@@ -533,6 +538,21 @@ mod tests {
             Some("1x1@60.000000Hz".to_string())
         );
 
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn saved_default_comes_from_autostart() {
+        let (dir, autostart_path) = temp_paths();
+        std::fs::write(
+            &autostart_path,
+            autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
+        )
+        .unwrap();
+        let module = LabwcDisplayModule::with_path(autostart_path);
+        let (output, mode) = module.saved_default().unwrap();
+        assert_eq!(output, "A");
+        assert_eq!(mode.spec(), "1x1@60.000000Hz");
         std::fs::remove_dir_all(dir).ok();
     }
 
