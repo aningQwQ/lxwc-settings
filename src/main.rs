@@ -25,8 +25,8 @@ fn load_system_cjk_font() -> Option<Vec<u8>> {
 fn main() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1000.0, 680.0])
-            .with_min_inner_size([780.0, 520.0])
+            .with_inner_size([1060.0, 760.0])
+            .with_min_inner_size([880.0, 620.0])
             .with_title("LXWC 设置中心"),
         ..Default::default()
     };

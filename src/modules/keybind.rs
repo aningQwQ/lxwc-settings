@@ -147,8 +147,12 @@ pub fn show(app: &mut App, ui: &mut egui::Ui) {
             };
             if ui
                 .add(
-                    egui::Button::new(RichText::new(submit_label).strong())
-                        .fill(theme::ACCENT),
+                    egui::Button::new(
+                        RichText::new(submit_label)
+                            .strong()
+                            .color(egui::Color32::WHITE),
+                    )
+                    .fill(theme::ACCENT),
                 )
                 .clicked()
             {
@@ -544,7 +548,7 @@ fn key_button(ui: &mut egui::Ui, label: &str, value: &str, selected: bool) -> bo
     } else {
         ui.visuals().widgets.inactive.bg_fill
     };
-    ui.add_sized([54.0, 26.0], egui::Button::new(text).fill(fill))
+    ui.add_sized([66.0, 30.0], egui::Button::new(text).fill(fill))
         .on_hover_text(value)
         .clicked()
 }

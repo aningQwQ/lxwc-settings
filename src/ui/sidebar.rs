@@ -5,7 +5,7 @@ use crate::core::model::ModuleKind;
 
 pub fn show(app: &mut App, ctx: &egui::Context) {
     egui::SidePanel::left("sidebar")
-        .exact_width(200.0)
+        .exact_width(220.0)
         .resizable(false)
         .show(ctx, |ui| {
             ui.add_space(12.0);
@@ -43,28 +43,5 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     }
                 }
             }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.add_space(8.0);
-                if let Some(baseline) = &app.baseline {
-                    ui.label(
-                        RichText::new(format!("env: {}", baseline.env_path.display()))
-                            .small()
-                            .weak(),
-                    );
-                    ui.label(
-                        RichText::new(format!("rc.xml: {}", baseline.rc_path.display()))
-                            .small()
-                            .weak(),
-                    );
-                } else if let Some(err) = &app.load_error {
-                    ui.colored_label(
-                        crate::ui::theme::DANGER,
-                        RichText::new(err).small(),
-                    );
-                }
-                ui.separator();
-                ui.label(RichText::new("手改配置后点“重新扫描”").small().weak());
-            });
         });
 }

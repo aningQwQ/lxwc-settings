@@ -32,13 +32,18 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let apply_text = format!("确认应用（{pending}）");
-                let fill = if pending > 0 {
-                    theme::ACCENT
+                let (fill, text_color) = if pending > 0 {
+                    (theme::ACCENT, egui::Color32::WHITE)
                 } else {
-                    egui::Color32::from_rgb(60, 64, 70)
+                    (
+                        egui::Color32::from_rgb(228, 231, 236),
+                        ui.visuals().text_color(),
+                    )
                 };
-                let apply_button =
-                    egui::Button::new(RichText::new(apply_text).strong()).fill(fill);
+                let apply_button = egui::Button::new(
+                    RichText::new(apply_text).strong().color(text_color),
+                )
+                .fill(fill);
                 if ui
                     .add_enabled(pending > 0 && !applying, apply_button)
                     .clicked()

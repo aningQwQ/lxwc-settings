@@ -120,7 +120,6 @@ pub fn attrs_to_input(attrs: &[(String, String)]) -> String {
 pub struct App {
     worker: WorkerHandle,
     pub baseline: Option<Baseline>,
-    pub load_error: Option<String>,
     pub outputs: Vec<OutputInfo>,
     pub outputs_error: Option<String>,
     pub scanning: bool,
@@ -151,7 +150,6 @@ impl App {
         let app = Self {
             worker,
             baseline: None,
-            load_error: None,
             outputs: Vec::new(),
             outputs_error: None,
             scanning: true,
@@ -203,12 +201,10 @@ impl App {
             Ok(baseline) => {
                 let reset = self.reset_on_baseline || self.baseline.is_none();
                 self.reset_on_baseline = false;
-                self.load_error = None;
                 self.adopt_baseline(baseline, reset);
                 self.status = Some(StatusMessage::info("配置已重新载入"));
             }
             Err(err) => {
-                self.load_error = Some(err.clone());
                 self.status = Some(StatusMessage::error(format!("读取配置失败：{err}")));
             }
         }
@@ -267,12 +263,13 @@ impl App {
             self.keybind_form.error = None;
         }
 
-        match baseline {
-            Ok(baseline) => self.adopt_baseline(baseline, false),
-            Err(err) => {
-                self.load_error = Some(err.clone());
+        let reload_error = match baseline {
+            Ok(baseline) => {
+                self.adopt_baseline(baseline, false);
+                None
             }
-        }
+            Err(err) => Some(err),
+        };
 
         let success = report.success_count();
         let failure = report.failure_count();
@@ -283,9 +280,12 @@ impl App {
         if let Some(err) = &report.reconfigure_error {
             text.push_str(&format!("；labwc 重载失败：{err}"));
         }
+        if let Some(err) = &reload_error {
+            text.push_str(&format!("；重读配置失败：{err}"));
+        }
         self.status = Some(StatusMessage {
             text,
-            error: failure > 0 || report.reconfigure_error.is_some(),
+            error: failure > 0 || report.reconfigure_error.is_some() || reload_error.is_some(),
         });
         self.report_open = failure > 0 || report.reconfigure_error.is_some();
         self.report = Some(report);
@@ -971,7 +971,9 @@ impl App {
                     if ui
                         .add(
                             egui::Button::new(
-                                egui::RichText::new("保留此设置").strong(),
+                                egui::RichText::new("保留此设置")
+                                    .strong()
+                                    .color(egui::Color32::WHITE),
                             )
                             .fill(theme::ACCENT),
                         )
