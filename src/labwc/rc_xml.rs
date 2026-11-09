@@ -158,6 +158,30 @@ pub fn validate_action_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+pub fn exists(raw: &str, path: &str) -> bool {
+    if raw.trim().is_empty() {
+        return false;
+    }
+    let Ok(tree) = parse_tree(raw) else {
+        return false;
+    };
+    find_node(&tree, &split_path(path)).is_some()
+}
+
+pub fn get_attr(raw: &str, path: &str, name: &str) -> Option<String> {
+    if raw.trim().is_empty() {
+        return None;
+    }
+    let tree = parse_tree(raw).ok()?;
+    let node = find_node(&tree, &split_path(path))?;
+    let tag = &raw[node.start..node.start_end];
+    let mut reader = Reader::from_str(tag);
+    match reader.read_event().ok()? {
+        Event::Start(event) | Event::Empty(event) => attr(&event, name.as_bytes()),
+        _ => None,
+    }
+}
+
 pub fn get(raw: &str, path: &str) -> Option<String> {
     if raw.trim().is_empty() {
         return None;
@@ -1305,6 +1329,35 @@ mod tests {
         let removed = patch(&raw, &[], &["A-F2".to_string()]).unwrap();
         let after_remove = parse(&removed).unwrap();
         assert_eq!(after_remove.len(), before.len() - 1);
+    }
+
+    #[test]
+    fn reads_node_attributes() {
+        assert_eq!(
+            get_attr(RC, "/labwc_config/keyboard/keybind", "key").as_deref(),
+            Some("W-p")
+        );
+        assert_eq!(
+            get_attr(RC, "/labwc_config/keyboard/keybind/action", "name").as_deref(),
+            Some("Execute")
+        );
+        assert_eq!(
+            get_attr(RC, "/labwc_config/keyboard/keybind", "missing"),
+            None
+        );
+        let raw = r#"<labwc_config><libinput><device><fallbackCurve step="2" points="0 2 4" /></device></libinput></labwc_config>"#;
+        assert_eq!(
+            get_attr(raw, "/labwc_config/libinput/device/fallbackCurve", "step").as_deref(),
+            Some("2")
+        );
+    }
+
+    #[test]
+    fn detects_existing_nodes_case_insensitively() {
+        assert!(exists(RC, "/labwc_config/keyboard"));
+        assert!(exists(RC, "/LABWC_CONFIG/Keyboard"));
+        assert!(!exists(RC, "/labwc_config/mouse"));
+        assert!(!exists("", "/labwc_config"));
     }
 
     #[test]

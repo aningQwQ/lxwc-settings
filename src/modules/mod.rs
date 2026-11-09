@@ -112,6 +112,10 @@ pub trait SettingsModule {
     fn on_applied(&mut self, report: &ApplyReport);
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut ModuleCtx);
 
+    fn is_valid(&self) -> bool {
+        true
+    }
+
     fn config_edits(&mut self) -> Vec<ConfigEdit> {
         Vec::new()
     }

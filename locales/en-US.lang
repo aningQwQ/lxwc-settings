@@ -313,7 +313,6 @@ ctrl_shift	Ctrl+Shift
 cursor	Cursor
 cursor_size	Cursor size
 custom	Custom
-custom_acceleration_curves_not_implemented	Custom acceleration curves are not implemented yet; existing curves are preserved.
 decoration	Decoration
 default	Default
 disable_while_typing	Disable while typing
@@ -407,3 +406,14 @@ window_decoration	Window decoration
 window_edge_strength	Window edge strength
 window_theme	Window theme
 invalid_configuration_path	Invalid configuration path.
+acceleration_curves	Acceleration curves
+acceleration_curves_help	Step is the spacing between input samples; Points are 2-32 non-negative output speeds.
+curve_points_error	Enter 2 to 32 finite, non-negative numbers separated by spaces.
+curve_step_error	Step must be a positive, finite number.
+define_fallback_curve	Define Fallback curve
+define_motion_curve	Define Motion curve
+define_scroll_curve	Define Scroll curve
+fix_invalid_input_before_applying	Fix invalid input before applying.
+points	Points
+select_custom_profile_to_edit_curves	Select the Custom acceleration profile to edit curves.
+step	Step

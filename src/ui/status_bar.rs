@@ -31,6 +31,7 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                 .sum();
             let applying = app.applying;
             let has_report = app.report.is_some();
+            let valid = app.modules.iter().all(|module| module.is_valid());
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let apply_text = crate::trf!("apply_2", pending);
@@ -46,7 +47,12 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
                     egui::Button::new(RichText::new(apply_text).strong().color(text_color))
                         .fill(fill);
                 if ui
-                    .add_enabled(pending > 0 && !applying, apply_button)
+                    .add_enabled(pending > 0 && !applying && valid, apply_button)
+                    .on_disabled_hover_text(if valid {
+                        ""
+                    } else {
+                        t("fix_invalid_input_before_applying")
+                    })
                     .clicked()
                 {
                     app.confirm_open = true;

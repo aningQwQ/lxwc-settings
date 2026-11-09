@@ -292,7 +292,10 @@ impl App {
 
     pub fn execute_pending(&mut self) {
         self.confirm_open = false;
-        if self.pending.is_empty() || self.applying {
+        if self.pending.is_empty()
+            || self.applying
+            || self.modules.iter().any(|module| !module.is_valid())
+        {
             return;
         }
         self.applying = true;

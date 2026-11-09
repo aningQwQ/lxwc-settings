@@ -1,22 +1,6 @@
 # TODO
 
-当前已完成外观、窗口行为、鼠标/触控板、键盘、触摸屏的标量设置，以及 rc.xml 与环境文件的跨模块聚合写入。以下是尚未实现或与 labwc-tweaks 存在差异的功能。
-
-## P1 自定义指针加速曲线
-
-对应 labwc-tweaks 的 Custom acceleration profile，需要 labwc >= 0.20.3。
-
-- 编辑 `motionCurve`、`scrollCurve`、`fallbackCurve`。
-- 每条曲线支持 Define 开关、Step、Points。
-- 校验 Step 为有限正数。
-- 校验 Points 为 2–32 个有限非负数，分隔符兼容空格、Tab、换行。
-- 无效输入阻止 Apply，并显示具体错误。
-- 写入时使用子元素 `step`、`points`。
-- 取消 Define 时删除对应曲线节点。
-- 未修改的曲线保留原 XML 结构和属性。
-- 兜底规则：Motion/Scroll 未定义时使用 Fallback；Fallback 也未定义时不启用加速。
-- 选定 Custom 时禁用 Pointer Speed，Scroll Factor 仍可用。
-- 补充曲线解析、校验、写入和删除测试。
+当前已完成外观、窗口行为、鼠标/触控板、键盘、触摸屏的标量设置，rc.xml 与环境文件的跨模块聚合写入，以及自定义指针加速曲线。以下是尚未实现或与 labwc-tweaks 存在差异的功能。
 
 ## P1 About / 系统信息页
 

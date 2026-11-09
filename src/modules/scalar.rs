@@ -70,6 +70,10 @@ impl ScalarState {
         self.reload(false);
     }
 
+    pub fn raw(&self) -> &str {
+        &self.raw
+    }
+
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }

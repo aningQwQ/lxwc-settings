@@ -2,10 +2,11 @@ use eframe::egui::{self, RichText};
 
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::labwc::themes;
+use crate::labwc::accel::{self, CurveError};
+use crate::labwc::{rc_xml, themes};
 use crate::modules::scalar::{EnvState, ScalarState, Spec};
 use crate::modules::{
-    Category, ConfigEdit, ModuleCtx, ModuleMeta, SettingsModule, ENVIRONMENT_TASK_ID,
+    Category, ConfigEdit, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, ENVIRONMENT_TASK_ID,
     RC_XML_TASK_ID,
 };
 use crate::ui::theme;
@@ -76,19 +77,180 @@ const SPECS: &[Spec] = &[
     },
 ];
 
+const CURVES: [(&str, &str); 3] = [
+    ("motionCurve", "define_motion_curve"),
+    ("scrollCurve", "define_scroll_curve"),
+    ("fallbackCurve", "define_fallback_curve"),
+];
+const CURVE_BASE: &str = "/labwc_config/libinput/device/";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CurveSnapshot {
+    defined: bool,
+    step: String,
+    points: String,
+}
+
+struct CurveEditor {
+    name: &'static str,
+    title: &'static str,
+    path: String,
+    defined: bool,
+    step: String,
+    points: String,
+    original: CurveSnapshot,
+    error: Option<CurveError>,
+}
+
+impl CurveEditor {
+    fn new(name: &'static str, title: &'static str) -> Self {
+        Self {
+            name,
+            title,
+            path: format!("{CURVE_BASE}{name}"),
+            defined: false,
+            step: String::new(),
+            points: String::new(),
+            original: CurveSnapshot {
+                defined: false,
+                step: String::new(),
+                points: String::new(),
+            },
+            error: None,
+        }
+    }
+
+    fn reload(&mut self, raw: &str) {
+        self.defined = rc_xml::exists(raw, &self.path);
+        self.step = rc_xml::get(raw, &format!("{}/step", self.path))
+            .or_else(|| rc_xml::get_attr(raw, &self.path, "step"))
+            .unwrap_or_else(|| "1".to_string());
+        self.points = rc_xml::get(raw, &format!("{}/points", self.path))
+            .or_else(|| rc_xml::get_attr(raw, &self.path, "points"))
+            .unwrap_or_else(|| "0 1".to_string());
+        self.original = CurveSnapshot {
+            defined: self.defined,
+            step: self.step.clone(),
+            points: self.points.clone(),
+        };
+        self.validate();
+    }
+
+    fn validate(&mut self) {
+        self.error = if self.defined {
+            accel::validate(&self.step, &self.points).err()
+        } else {
+            None
+        };
+    }
+
+    fn is_valid(&self) -> bool {
+        !self.defined || self.error.is_none()
+    }
+
+    fn is_changed(&self) -> bool {
+        if self.defined != self.original.defined {
+            return true;
+        }
+        self.defined && (self.step != self.original.step || self.points != self.original.points)
+    }
+
+    fn show(&mut self, ui: &mut egui::Ui) {
+        let mut defined = self.defined;
+        if ui.checkbox(&mut defined, t(self.title)).changed() {
+            self.defined = defined;
+            self.validate();
+        }
+        if self.defined {
+            ui.horizontal(|ui| {
+                ui.label(t("step"));
+                if ui.text_edit_singleline(&mut self.step).changed() {
+                    self.validate();
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label(t("points"));
+                if ui.text_edit_singleline(&mut self.points).changed() {
+                    self.validate();
+                }
+            });
+            if let Some(error) = self.error {
+                let key = match error {
+                    CurveError::Step => "curve_step_error",
+                    CurveError::Points => "curve_points_error",
+                };
+                ui.colored_label(theme::DANGER, RichText::new(t(key)).small());
+            }
+        }
+        ui.add_space(4.0);
+    }
+}
+
 pub struct MouseModule {
     rc: ScalarState,
     env: EnvState,
     cursor_themes: Vec<String>,
+    curves: Vec<CurveEditor>,
 }
 
 impl MouseModule {
     pub fn new() -> Self {
-        Self {
+        let mut module = Self {
             rc: ScalarState::new(SPECS),
             env: EnvState::new(ENV_KEYS),
             cursor_themes: themes::cursor_themes(),
+            curves: CURVES
+                .iter()
+                .map(|(name, title)| CurveEditor::new(name, title))
+                .collect(),
+        };
+        module.load_curves();
+        module
+    }
+
+    fn load_curves(&mut self) {
+        let raw = self.rc.raw().to_string();
+        for curve in &mut self.curves {
+            curve.reload(&raw);
         }
+    }
+
+    fn curves_patch(&self, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        if self.rc.get("/labwc_config/libinput/device/accelProfile") != "custom"
+            || !self.curves.iter().all(CurveEditor::is_valid)
+        {
+            return Ok(None);
+        }
+
+        let mut current = raw.to_string();
+        let mut changes = Vec::new();
+        for curve in &self.curves {
+            if !curve.is_changed() {
+                continue;
+            }
+            if !curve.defined {
+                current = rc_xml::remove(&current, &curve.path)?;
+                changes.push(format!("-{}", curve.name));
+                continue;
+            }
+            let (step, points) = accel::validate(&curve.step, &curve.points)
+                .map_err(|_| crate::i18n::t("curve_points_error").to_string())?;
+            let step_path = format!("{}/step", curve.path);
+            let points_path = format!("{}/points", curve.path);
+            current = rc_xml::remove(&current, &curve.path)?;
+            current = rc_xml::set(&current, &step_path, &step)?;
+            current = rc_xml::set(&current, &points_path, &points)?;
+            changes.push(format!("{}: {} / {}", curve.name, step, points));
+        }
+
+        if changes.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(PatchOutcome {
+            contents: current,
+            summary: changes.join("; "),
+            count: changes.len(),
+        }))
     }
 }
 
@@ -106,6 +268,12 @@ impl SettingsModule for MouseModule {
         self.rc.reload(true);
         self.env.reload(true);
         self.cursor_themes = themes::cursor_themes();
+        self.load_curves();
+    }
+
+    fn is_valid(&self) -> bool {
+        self.rc.get("/labwc_config/libinput/device/accelProfile") != "custom"
+            || self.curves.iter().all(CurveEditor::is_valid)
     }
 
     fn config_edits(&mut self) -> Vec<ConfigEdit> {
@@ -114,9 +282,14 @@ impl SettingsModule for MouseModule {
         edits
     }
 
+    fn rc_xml_patch(&mut self, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        self.curves_patch(raw)
+    }
+
     fn on_applied(&mut self, report: &ApplyReport) {
         if report.task_succeeded(RC_XML_TASK_ID, RC_XML_TASK_ID) {
             self.rc.commit();
+            self.load_curves();
         } else if report.task_failed(RC_XML_TASK_ID, RC_XML_TASK_ID) {
             self.rc.sync_after_apply();
         }
@@ -204,13 +377,21 @@ impl SettingsModule for MouseModule {
             !custom,
             &mut self.rc,
         );
+        section(ui, "acceleration_curves");
         if custom {
+            ui.label(RichText::new(t("acceleration_curves_help")).small().weak());
+        } else {
             ui.label(
-                RichText::new(t("custom_acceleration_curves_not_implemented"))
+                RichText::new(t("select_custom_profile_to_edit_curves"))
                     .small()
                     .weak(),
             );
         }
+        ui.add_enabled_ui(custom, |ui| {
+            for curve in &mut self.curves {
+                curve.show(ui);
+            }
+        });
 
         section(ui, "tapping");
         checkbox(
@@ -425,4 +606,134 @@ fn string_combo(
                 }
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    const CURVES_RC: &str = r#"<labwc_config>
+  <libinput>
+    <device>
+      <accelProfile>custom</accelProfile>
+      <motionCurve custom="yes">
+        <step>1</step>
+        <points>0 1</points>
+      </motionCurve>
+      <scrollCurve keep="yes">
+        <step>1</step>
+        <points>0 2</points>
+      </scrollCurve>
+    </device>
+  </libinput>
+</labwc_config>
+"#;
+
+    fn temp_module(raw: &str) -> (PathBuf, MouseModule) {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("lxwc-mouse-test-{unique}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let rc_path = dir.join("rc.xml");
+        let env_path = dir.join("environment");
+        std::fs::write(&rc_path, raw).unwrap();
+
+        let mut module = MouseModule {
+            rc: ScalarState::with_path(rc_path, SPECS),
+            env: EnvState::with_path(env_path, ENV_KEYS),
+            cursor_themes: Vec::new(),
+            curves: CURVES
+                .iter()
+                .map(|(name, title)| CurveEditor::new(name, title))
+                .collect(),
+        };
+        module.load_curves();
+        (dir, module)
+    }
+
+    #[test]
+    fn reads_attribute_based_curve() {
+        let raw = r#"<labwc_config>
+  <libinput>
+    <device>
+      <accelProfile>custom</accelProfile>
+      <fallbackCurve step="2" points="0 2 4" />
+    </device>
+  </libinput>
+</labwc_config>
+"#;
+        let (dir, module) = temp_module(raw);
+        assert!(module.curves[2].defined);
+        assert_eq!(module.curves[2].step, "2");
+        assert_eq!(module.curves[2].points, "0 2 4");
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn untouched_curves_are_not_rewritten() {
+        let (dir, module) = temp_module(CURVES_RC);
+        let raw = module.rc.raw().to_string();
+        assert!(module.curves_patch(&raw).unwrap().is_none());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn edits_one_curve_and_preserves_the_other() {
+        let (dir, mut module) = temp_module(CURVES_RC);
+        module.curves[0].step = "2".to_string();
+        module.curves[0].points = "0 2 4".to_string();
+        module.curves[0].validate();
+
+        let raw = module.rc.raw().to_string();
+        let patch = module.curves_patch(&raw).unwrap().unwrap();
+        assert!(patch.contents.contains("<step>2</step>"));
+        assert!(patch.contents.contains("<points>0 2 4</points>"));
+        assert!(patch.contents.contains("<scrollCurve keep=\"yes\">"));
+        assert!(patch.contents.contains("<points>0 2</points>"));
+        assert!(!patch.contents.contains("custom=\"yes\""));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn disabling_curve_removes_it() {
+        let (dir, mut module) = temp_module(CURVES_RC);
+        module.curves[0].defined = false;
+        module.curves[0].validate();
+
+        let raw = module.rc.raw().to_string();
+        let patch = module.curves_patch(&raw).unwrap().unwrap();
+        assert!(!patch.contents.contains("<motionCurve"));
+        assert!(patch.contents.contains("<scrollCurve keep=\"yes\">"));
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn invalid_curve_blocks_apply_and_patch() {
+        let (dir, mut module) = temp_module(CURVES_RC);
+        module.curves[0].step = "0".to_string();
+        module.curves[0].validate();
+
+        assert!(!module.is_valid());
+        let raw = module.rc.raw().to_string();
+        assert!(module.curves_patch(&raw).unwrap().is_none());
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn curves_are_ignored_outside_custom_profile() {
+        let (dir, mut module) = temp_module(CURVES_RC);
+        module.curves[0].step = "2".to_string();
+        module.curves[0].validate();
+        module
+            .rc
+            .set("/labwc_config/libinput/device/accelProfile", "flat");
+
+        let raw = module.rc.raw().to_string();
+        assert!(module.curves_patch(&raw).unwrap().is_none());
+        std::fs::remove_dir_all(dir).ok();
+    }
 }

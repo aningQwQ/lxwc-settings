@@ -313,7 +313,6 @@ ctrl_shift	Ctrl+Shift
 cursor	光标
 cursor_size	光标大小
 custom	自定义
-custom_acceleration_curves_not_implemented	暂未实现自定义加速曲线编辑，现有曲线会保留。
 decoration	装饰方式
 default	默认
 disable_while_typing	输入时禁用触摸板
@@ -407,3 +406,14 @@ window_decoration	窗口装饰
 window_edge_strength	窗口边缘强度
 window_theme	窗口主题
 invalid_configuration_path	配置路径无效。
+acceleration_curves	自定义加速曲线
+acceleration_curves_help	Step 是采样间距；Points 为 2–32 个非负输出速度。
+curve_points_error	请输入 2–32 个有限非负数，用空格分隔。
+curve_step_error	Step 必须为有限正数。
+define_fallback_curve	定义 Fallback 曲线
+define_motion_curve	定义 Motion 曲线
+define_scroll_curve	定义 Scroll 曲线
+fix_invalid_input_before_applying	请先修正无效输入再应用。
+points	采样点
+select_custom_profile_to_edit_curves	选择 Custom 加速配置后可编辑曲线。
+step	步进

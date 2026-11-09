@@ -1,3 +1,4 @@
+pub mod accel;
 pub mod actions;
 pub mod autostart;
 pub mod environment;
