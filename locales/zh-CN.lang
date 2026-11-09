@@ -157,9 +157,17 @@ letters	字母
 lxqt_lock_screen	锁定屏幕
 lxqt_log_out	注销
 lxqt_open_file_manager	打开文件管理器
-lxqt_open_start_menu	呼出开始菜单
+lxqt_open_start_menu	打开开始菜单（Fancy Menu）
 lxqt_open_terminal	打开终端
 lxqt_presets	LXQt 预设
+lxqt_clipboard	剪贴板历史
+lxqt_hibernate	休眠
+lxqt_restart_panel	重启面板
+lxqt_run_dialog	运行命令
+lxqt_suspend	挂起
+lxqt_volume_down	音量降低
+lxqt_volume_mute	静音
+lxqt_volume_up	音量增加
 lxqt_reboot	重启
 lxqt_show_desktop	显示桌面
 lxqt_shut_down	关机

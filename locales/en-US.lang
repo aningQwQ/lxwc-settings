@@ -157,9 +157,17 @@ letters	Letters
 lxqt_lock_screen	Lock screen
 lxqt_log_out	Log out
 lxqt_open_file_manager	Open file manager
-lxqt_open_start_menu	Open start menu
+lxqt_open_start_menu	Open Fancy Menu
 lxqt_open_terminal	Open terminal
 lxqt_presets	LXQt presets
+lxqt_clipboard	Clipboard history
+lxqt_hibernate	Hibernate
+lxqt_restart_panel	Restart panel
+lxqt_run_dialog	Run command
+lxqt_suspend	Suspend
+lxqt_volume_down	Volume down
+lxqt_volume_mute	Mute
+lxqt_volume_up	Volume up
 lxqt_reboot	Reboot
 lxqt_show_desktop	Show desktop
 lxqt_shut_down	Shut down
