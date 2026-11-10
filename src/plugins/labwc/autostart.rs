@@ -1,4 +1,4 @@
-use crate::core::outputs::Mode;
+use crate::plugins::wlr::Mode;
 
 const AUTOSTART_BEGIN: &str = "# BEGIN lxwc-settings default display";
 const AUTOSTART_END: &str = "# END lxwc-settings default display";

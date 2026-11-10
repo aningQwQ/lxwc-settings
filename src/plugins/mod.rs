@@ -1,8 +1,8 @@
 use eframe::egui;
 
-use crate::backend::{Backend, Deps};
+use crate::backend::Backend;
 use crate::modules::SettingsModule;
-use crate::plugin::Plugin;
+use crate::plugin::{Capability, Plugin};
 
 #[cfg(feature = "labwc")]
 pub mod labwc;
@@ -51,12 +51,6 @@ pub fn detect() -> &'static str {
 /// its pages and the groups contributed by page plugins.
 pub fn compose(requested: &str, ctx: &egui::Context) -> Composition {
     let enabled = resolve();
-    let deps = Deps {
-        outputs: enabled
-            .iter()
-            .find_map(|plugin| plugin.outputs)
-            .map(|new| new()),
-    };
 
     let backend_plugin = enabled
         .iter()
@@ -84,7 +78,7 @@ pub fn compose(requested: &str, ctx: &egui::Context) -> Composition {
     let mut modules = Vec::new();
     for plugin in &enabled {
         if let Some(pages) = plugin.pages {
-            modules.extend(pages(ctx, &deps));
+            modules.extend(pages(ctx));
         }
     }
 
@@ -93,7 +87,7 @@ pub fn compose(requested: &str, ctx: &egui::Context) -> Composition {
 
 fn resolve() -> Vec<&'static Plugin> {
     let mut enabled: Vec<&'static Plugin> = Vec::new();
-    let mut provided: Vec<&'static str> = Vec::new();
+    let mut provided: Vec<Capability> = Vec::new();
 
     loop {
         let mut changed = false;
@@ -132,8 +126,41 @@ mod tests {
                     provided.contains(need),
                     "plugin {} enabled without provider for {}",
                     plugin.id,
-                    need
+                    need.as_str()
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn every_requirement_has_a_provider_in_the_full_set() {
+        let provided = PLUGINS
+            .iter()
+            .flat_map(|plugin| plugin.provides.iter().copied())
+            .collect::<Vec<_>>();
+        for plugin in PLUGINS {
+            for need in plugin.requires {
+                assert!(
+                    provided.contains(need),
+                    "plugin {} requires {} but no plugin provides it",
+                    plugin.id,
+                    need.as_str()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn no_capability_has_two_providers() {
+        let mut seen: Vec<&'static str> = Vec::new();
+        for plugin in PLUGINS {
+            for capability in plugin.provides {
+                assert!(
+                    !seen.contains(&capability.as_str()),
+                    "capability {} has more than one provider",
+                    capability.as_str()
+                );
+                seen.push(capability.as_str());
             }
         }
     }
@@ -145,20 +172,5 @@ mod tests {
         assert!(composition.backend.files.is_empty());
         assert!(composition.backend.groups.is_empty());
         assert!(composition.modules.is_empty());
-    }
-
-    #[test]
-    fn every_enabled_backend_has_a_provider() {
-        let enabled = resolve();
-        for plugin in enabled.iter().filter(|plugin| plugin.backend.is_some()) {
-            for need in plugin.requires {
-                assert!(
-                    enabled.iter().any(|item| item.provides.contains(need)),
-                    "backend {} requires {} with no enabled provider",
-                    plugin.id,
-                    need
-                );
-            }
-        }
     }
 }

@@ -61,13 +61,20 @@ fn core_does_not_depend_on_pages_plugins_or_modules() {
 }
 
 #[test]
-fn plugins_do_not_import_each_other() {
+fn plugin_imports_are_backed_by_requires() {
     let plugins = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/plugins");
     for entry in fs::read_dir(&plugins).expect("src/plugins").flatten() {
         if !entry.path().is_dir() {
             continue;
         }
         let id = entry.file_name().to_string_lossy().to_string();
+        let Some(owner) = crate::plugins::PLUGINS
+            .iter()
+            .find(|plugin| plugin.id == id)
+        else {
+            continue;
+        };
+
         for path in sources(&format!("src/plugins/{id}")) {
             let text = fs::read_to_string(&path).expect("read source");
             for other in fs::read_dir(&plugins).expect("src/plugins").flatten() {
@@ -76,9 +83,21 @@ fn plugins_do_not_import_each_other() {
                     continue;
                 }
                 let needle = format!("crate::plugins::{other_id}");
+                if !text.contains(&needle) {
+                    continue;
+                }
+                let Some(provider) = crate::plugins::PLUGINS
+                    .iter()
+                    .find(|plugin| plugin.id == other_id)
+                else {
+                    continue;
+                };
                 assert!(
-                    !text.contains(&needle),
-                    "{} must not import plugin `{}`",
+                    provider
+                        .provides
+                        .iter()
+                        .any(|capability| owner.requires.contains(capability)),
+                    "{} imports plugin `{}` without declaring one of its capabilities",
                     path.display(),
                     other_id
                 );

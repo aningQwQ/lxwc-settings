@@ -1,5 +1,5 @@
 // Shell-only builds keep kernel contract types that no plugin uses yet.
-#![cfg_attr(not(feature = "labwc"), allow(dead_code))]
+#![cfg_attr(not(all(feature = "labwc", feature = "wlr-ui")), allow(dead_code))]
 
 mod app;
 #[cfg(test)]

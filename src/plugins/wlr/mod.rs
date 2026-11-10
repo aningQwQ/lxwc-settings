@@ -1,16 +1,19 @@
-use std::sync::Arc;
+pub mod outputs;
 
-use crate::core::outputs::{Mode, OutputInfo, Outputs};
-use crate::plugin::{capability, Plugin};
+pub use outputs::{Mode, OutputInfo, Outputs};
+
+use crate::plugin::{Capability, Plugin};
+
+/// Contract owned by this provider. Consumers must adapt to it.
+pub const CAPABILITY: Capability = Capability::new("wlr.outputs");
 
 pub const PLUGIN: Plugin = Plugin {
     id: "wlr",
-    provides: &[capability::OUTPUTS],
+    provides: &[CAPABILITY],
     requires: &[],
     groups: &[],
     backend: None,
     pages: None,
-    outputs: Some(|| Arc::new(WlrOutputs)),
 };
 
 pub struct WlrOutputs;
@@ -26,7 +29,7 @@ impl Outputs for WlrOutputs {
 }
 
 fn format_spec(mode: &Mode) -> String {
-    format!("{}x{}@{:.6}Hz", mode.width, mode.height, mode.refresh)
+    mode.spec()
 }
 
 fn set_mode(output: &str, spec: &str) -> Result<(), String> {

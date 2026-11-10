@@ -7,6 +7,11 @@ pub struct Mode {
 }
 
 impl Mode {
+    /// Textual form used by `wlr-randr` and persisted in autostart.
+    pub fn spec(&self) -> String {
+        format!("{}x{}@{:.6}Hz", self.width, self.height, self.refresh)
+    }
+
     pub fn label(&self) -> String {
         format!("{} × {} @ {:.2} Hz", self.width, self.height, self.refresh)
     }

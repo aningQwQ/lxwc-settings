@@ -2,10 +2,11 @@ use eframe::egui;
 
 #[cfg(feature = "wlr-ui")]
 use crate::backend::GROUP_OUTPUT;
-use crate::backend::{Backend, Deps, Group};
+use crate::backend::{Backend, Group};
 use crate::config::ConfigFile;
 use crate::modules::SettingsModule;
-use crate::plugin::{capability, Plugin};
+use crate::plugin::Plugin;
+use crate::plugins::wlr::CAPABILITY as WLR_OUTPUTS;
 
 pub mod accel;
 pub mod actions;
@@ -31,12 +32,11 @@ pub const ENVIRONMENT_FILE: &str = "environment";
 
 pub const PLUGIN: Plugin = Plugin {
     id: ID,
-    provides: &[capability::BACKEND],
-    requires: &[capability::OUTPUTS],
+    provides: &[],
+    requires: &[WLR_OUTPUTS],
     groups: &[],
     backend: Some(backend),
     pages: Some(pages),
-    outputs: None,
 };
 
 pub fn backend() -> Backend {
@@ -72,11 +72,7 @@ pub fn backend() -> Backend {
     }
 }
 
-pub fn pages(_ctx: &egui::Context, deps: &Deps) -> Vec<Box<dyn SettingsModule>> {
-    let Some(outputs) = deps.outputs.clone() else {
-        return Vec::new();
-    };
-
+pub fn pages(_ctx: &egui::Context) -> Vec<Box<dyn SettingsModule>> {
     vec![
         Box::new(pages::appearance::AppearanceModule::new()),
         Box::new(pages::behaviour::BehaviourModule::new()),
@@ -85,7 +81,7 @@ pub fn pages(_ctx: &egui::Context, deps: &Deps) -> Vec<Box<dyn SettingsModule>> 
         Box::new(pages::touchscreen::TouchscreenModule::new()),
         Box::new(pages::keybind::KeybindModule::new()),
         #[cfg(feature = "wlr")]
-        Box::new(pages::display_persist::DisplayPersistModule::new(outputs)),
+        Box::new(pages::display_persist::DisplayPersistModule::new()),
         Box::new(pages::env::EnvModule::new()),
     ]
 }

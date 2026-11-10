@@ -114,18 +114,18 @@ Temporary files use the `.lxwc.tmp` suffix.
 ```text
 src/
   app.rs          Shell: task aggregation, confirmation, apply state
-  backend.rs      Backend/Group/Deps description the shell consumes
+  backend.rs      Backend/Group description the shell consumes
   plugin.rs       Plugin manifest: provides, requires, backend, pages, groups
   plugins/        Every optional unit, plus the registry
     mod.rs        Detection, requirement resolution, composition
-    labwc/        Backend plugin: adapters, config formats, pages
-    wlr/          Output provider plugin (headless)
-    wlr_ui/       Output-control page plugin (requires `wlr`)
+    labwc/        Backend plugin (requires `wlr.outputs`): adapters, formats, pages
+    wlr/          Output provider plugin: owns the `wlr.outputs` contract
+    wlr_ui/       Output page plugin: adapts to `wlr.outputs`
   config/         ConfigFile / ConfigFormat / ConfigEdit / PatchOutcome
   modules/        SettingsModule contract shared by every page
   pages/          Reserved for compositor-neutral pages (currently empty)
   services/       Generic file transactions and the background worker
-  core/           Domain model and capability traits (Outputs)
+  core/           Domain model: Effect, Task, ApplyReport
   ui/             Sidebar, status bar, and theme
   i18n.rs         Runtime translation loader
 ```
@@ -133,9 +133,13 @@ src/
 Dependency direction:
 
 - `core` and `config` know nothing about plugins, pages or UI.
-- Plugins never import each other; they meet at kernel contracts such as
-  `core::outputs::Outputs`. Only `plugins/mod.rs` references all plugins.
-- A provider plugin is headless; page plugins may use `modules/` and `ui/`.
+- A capability belongs to the provider that declares it, with a namespaced id
+  (`wlr.outputs`). Consumers `require` that id and import the provider module;
+  changing providers means adapting the consumer to the new contract.
+- A provider is headless and imports no other plugin. Only `plugins/mod.rs`
+  references all plugins.
+- `plugin_imports_are_backed_by_requires` checks that an import of another
+  plugin is backed by a declared requirement.
 - `pages/` must not import `crate::plugins` or name a backend key space.
 - The registry enables a plugin only when its `requires` are provided; a missing
   provider disables the plugin instead of running half of it.
@@ -151,9 +155,9 @@ Dependency direction:
 
 | Feature | Contents | Default |
 | --- | --- | --- |
-| `labwc` | Labwc backend plugin; pulls `wlr` and `wlr-ui` | on |
-| `wlr` | `wlr-randr` provider: output scan and live mode switching | on (via `labwc`) |
-| `wlr-ui` | Output-control page plugin | on (via `labwc`) |
+| `labwc` | Labwc backend plugin; pulls `wlr` | on |
+| `wlr` | `wlr-randr` provider: owns `wlr.outputs` | on (via `labwc`) |
+| `wlr-ui` | Output page plugin; requires `wlr.outputs` | on |
 
 `cargo build --no-default-features` builds the shell with no plugins and shows
 "No compositor backend or plugins are enabled". Dropping `wlr` requires dropping

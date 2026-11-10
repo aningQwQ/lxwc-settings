@@ -106,18 +106,18 @@ cargo install --path .
 ```text
 src/
   app.rs          外壳：任务聚合、确认与应用状态
-  backend.rs      外壳消费的后端/分组/能力描述
+  backend.rs      外壳消费的后端/分组描述
   plugin.rs       插件清单：provides、requires、backend、pages、groups
   plugins/        所有可选单元与注册表
     mod.rs        探测、需求解析、组装
-    labwc/        后端插件：适配器、配置格式、页面
-    wlr/          输出提供者插件（无 UI）
-    wlr_ui/       输出控制页面插件（requires `wlr`）
+    labwc/        后端插件（requires `wlr.outputs`）：适配器、配置格式、页面
+    wlr/          输出提供者插件：拥有 `wlr.outputs` 契约
+    wlr_ui/       输出页面插件：适配 `wlr.outputs`
   config/         ConfigFile / ConfigFormat / ConfigEdit / PatchOutcome
   modules/        所有页面共用的 SettingsModule 契约
   pages/          预留的合成器无关页面（目前为空）
   services/       通用文件事务和后台 worker
-  core/           领域模型与能力接口（Outputs）
+  core/           领域模型：Effect、Task、ApplyReport
   ui/             侧边栏、状态栏和主题
   i18n.rs         运行时翻译加载
 ```
@@ -125,9 +125,10 @@ src/
 依赖方向：
 
 - `core` 与 `config` 不认识插件、页面或 UI。
-- 插件之间不得互相 import，只能通过内核接口（如 `core::outputs::Outputs`）协作；
-  只有 `plugins/mod.rs` 引用所有插件。
-- 提供者插件无 UI；页面插件可以使用 `modules/` 与 `ui/`。
+- 能力属于声明它的提供者，名字带命名空间（`wlr.outputs`）。消费者必须 `require`
+  该能力并 import 提供者模块；换提供者意味着把消费者适配到新契约。
+- 提供者无 UI，也不 import 其他插件；只有 `plugins/mod.rs` 引用所有插件。
+- `plugin_imports_are_backed_by_requires` 检查：import 另一个插件必须有 `requires` 背书。
 - `pages/` 不得 import `crate::plugins`，也不得出现后端键空间。
 - 注册表只在 `requires` 被满足时启用插件；缺提供者时禁用该插件，而不是半套运行。
 - `modules/` 只是页面契约：页面只声明后端文件 id，不出现路径。
@@ -141,9 +142,9 @@ src/
 
 | Feature | 内容 | 默认 |
 | --- | --- | --- |
-| `labwc` | Labwc 后端插件，自动带上 `wlr` 与 `wlr-ui` | 开 |
-| `wlr` | `wlr-randr` 提供者：输出扫描与实时模式切换 | 开（由 `labwc` 带入） |
-| `wlr-ui` | 输出控制页面插件 | 开（由 `labwc` 带入） |
+| `labwc` | Labwc 后端插件，自动带上 `wlr` | 开 |
+| `wlr` | `wlr-randr` 提供者：拥有 `wlr.outputs` | 开（由 `labwc` 带入） |
+| `wlr-ui` | 输出页面插件，requires `wlr.outputs` | 开 |
 
 `cargo build --no-default-features` 构建零插件外壳，界面显示“没有启用任何合成器后端或插件”。
 卸载 `wlr` 必须同时卸载 `wlr-ui` 与 `labwc`，依赖边由 Cargo 保证。

@@ -7,10 +7,10 @@ No outstanding core tasks.
 - Moved the live output page to `plugins/wlr_ui`; `wlr` is now an optional
   prerequisite feature (`wlr-ui = ["wlr"]`) and the default build is unchanged.
 - Plugin model: everything optional lives in `plugins/` behind a `Plugin`
-  manifest (`provides`/`requires`/`pages`/`groups`), with `wlr` as a headless
-  provider and `wlr_ui` as a page plugin that consumes `core::outputs::Outputs`.
-  The registry disables plugins with unmet requirements and the shell-only build
-  (`--no-default-features`) runs without any backend.
+  manifest (`provides`/`requires`/`pages`/`groups`). `wlr` owns the
+  `wlr.outputs` contract and its types; `wlr_ui` and the Labwc persistence page
+  declare that capability and import the provider. The registry disables plugins
+  with unmet requirements and the shell-only build runs without any backend.
 - `SettingsModule` takes `ConfigEdit.file_id` and a single `patch(file_id, raw)` hook;
   `app` aggregates one task per backend file instead of two hardcoded files.
 - Architecture tests enforce page/backend/adapter dependency directions.

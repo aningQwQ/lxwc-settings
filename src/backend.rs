@@ -1,7 +1,4 @@
-use std::sync::Arc;
-
 use crate::config::{CommandSpec, ConfigFile};
-use crate::core::outputs::Outputs;
 
 /// Group id used by pages that do not belong to a single compositor.
 #[cfg(feature = "wlr-ui")]
@@ -22,12 +19,6 @@ pub struct Backend {
     pub groups: Vec<Group>,
     pub files: Vec<ConfigFile>,
     pub reload: Option<CommandSpec>,
-}
-
-/// Capabilities resolved by the plugin registry and handed to page builders.
-#[derive(Clone, Default)]
-pub struct Deps {
-    pub outputs: Option<Arc<dyn Outputs>>,
 }
 
 impl Backend {

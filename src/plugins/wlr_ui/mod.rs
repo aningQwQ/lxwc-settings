@@ -6,14 +6,14 @@ use std::time::{Duration, Instant};
 
 use eframe::egui::{self, RichText};
 
-use crate::backend::{Deps, Group, GROUP_OUTPUT};
+use crate::backend::{Group, GROUP_OUTPUT};
 use crate::core::model::{ApplyReport, Task};
-use crate::core::outputs::{Mode, OutputInfo, Outputs};
 use crate::i18n::t;
 use crate::modules::{
     ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule, DISPLAY_PERSIST_MODULE_ID,
 };
-use crate::plugin::{capability, Plugin};
+use crate::plugin::Plugin;
+use crate::plugins::wlr::{Mode, OutputInfo, Outputs, WlrOutputs, CAPABILITY};
 use crate::ui::theme;
 
 use worker::{Event as DisplayEvent, Request as DisplayRequest};
@@ -21,21 +21,17 @@ use worker::{Event as DisplayEvent, Request as DisplayRequest};
 pub const PLUGIN: Plugin = Plugin {
     id: "wlr-ui",
     provides: &[],
-    requires: &[capability::OUTPUTS],
+    requires: &[CAPABILITY],
     groups: &[Group {
         id: GROUP_OUTPUT,
         label_key: "wlr_module",
     }],
     backend: None,
     pages: Some(pages),
-    outputs: None,
 };
 
-fn pages(ctx: &egui::Context, deps: &Deps) -> Vec<Box<dyn SettingsModule>> {
-    match deps.outputs.clone() {
-        Some(outputs) => vec![Box::new(DisplayModule::new(ctx, outputs))],
-        None => Vec::new(),
-    }
+fn pages(ctx: &egui::Context) -> Vec<Box<dyn SettingsModule>> {
+    vec![Box::new(DisplayModule::new(ctx))]
 }
 
 const WATCHDOG_SECONDS: u64 = 15;
@@ -81,11 +77,12 @@ pub struct DisplayModule {
 }
 
 impl DisplayModule {
-    pub fn new(ui_ctx: &egui::Context, outputs: Arc<dyn Outputs>) -> Self {
+    pub fn new(ui_ctx: &egui::Context) -> Self {
         let repaint = {
             let ctx = ui_ctx.clone();
             move || ctx.request_repaint()
         };
+        let outputs: Arc<dyn Outputs> = Arc::new(WlrOutputs);
         let (tx, rx) = worker::spawn(outputs, repaint);
         Self {
             tx,
@@ -556,11 +553,11 @@ impl SettingsModule for DisplayModule {
             ctx.info(t("new_display_mode_kept"));
         } else if set_default {
             let output = watchdog.output.clone();
-            let mode = watchdog.mode;
+            let spec = watchdog.mode.spec();
             self.watchdog = None;
             ctx.requests.push(ModuleRequest {
                 target: DISPLAY_PERSIST_MODULE_ID,
-                payload: ModulePayload::DisplayDefault { output, mode },
+                payload: ModulePayload::DisplayDefault { output, spec },
             });
             ctx.info(t("display_default_handed_off"));
         }

@@ -1,7 +1,7 @@
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::Arc;
 
-use crate::core::outputs::{Mode, OutputInfo, Outputs};
+use crate::plugins::wlr::{Mode, OutputInfo, Outputs};
 
 pub enum Request {
     Scan,
