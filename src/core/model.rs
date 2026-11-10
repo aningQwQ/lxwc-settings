@@ -70,4 +70,13 @@ impl ApplyReport {
             .iter()
             .any(|result| !result.ok && result.module_id == module_id && result.id == task_id)
     }
+
+    /// Convenience for backend file tasks, whose id and module id are the file id.
+    pub fn file_succeeded(&self, file_id: &str) -> bool {
+        self.task_succeeded(file_id, file_id)
+    }
+
+    pub fn file_failed(&self, file_id: &str) -> bool {
+        self.task_failed(file_id, file_id)
+    }
 }

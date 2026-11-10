@@ -113,24 +113,33 @@ Temporary files use the `.lxwc.tmp` suffix.
 
 ```text
 src/
-  app.rs          Module routing, task aggregation, confirmation and apply state
-  core/           Domain model: Effect, Task, TaskResult, ApplyReport
-  services/       Generic file transactions and the background worker
+  app.rs          Backend-driven task aggregation, confirmation and apply state
+  backend.rs      Backend/Group description the shell consumes
+  backends/       One directory per compositor: adapters, config formats, pages
+    labwc/        rc.xml, environment, autostart, XKB, keybinds, Labwc pages
+    mod.rs        Detection, factories, page registration
+  config/         ConfigFile / ConfigFormat / ConfigEdit / PatchOutcome
+  modules/        SettingsModule contract shared by every page
+  pages/          Pages that are not tied to one compositor
   wlr/            WLR adapter: wlr-randr scanning, parsing, mode commands
-  labwc/          Labwc adapter: rc.xml, environment, autostart, paths, reconfigure
   plugins/        UI-free presets such as LXQt commands
-  modules/        UI and business state for each settings page
+  services/       Generic file transactions and the background worker
+  core/           Domain model: Effect, Task, TaskResult, ApplyReport
   ui/             Sidebar, status bar, and theme
   i18n.rs         Runtime translation loader
 ```
 
 Dependency direction:
 
-- `core` does not depend on UI or system adapters.
-- `wlr` and `labwc` are peer external-system adapters.
-- `modules` contain UI and state, but no direct file writes.
-- `app` collects tasks and routes module requests.
-- Persistence always goes through `Effect::WriteFile`.
+- `core` and `config` know nothing about pages, UI or a compositor.
+- `backends/<id>` owns paths, file formats, reload commands and its pages.
+- `pages/` holds compositor-neutral pages; it must not import `backends/`.
+- `modules/` is only the page contract: pages name a backend file id, never a path.
+- `app` reads the backend file list, aggregates one task per file, and routes page requests.
+- Persistence always goes through `Effect::WriteFile` / `Effect::RunCommand`.
+- `src/architecture_tests.rs` enforces these edges at test time.
+
+`LXWC_BACKEND` forces a backend. With one backend it defaults to `labwc`.
 
 ## Testing
 

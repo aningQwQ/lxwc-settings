@@ -4,14 +4,14 @@ use std::time::Duration;
 
 use eframe::egui::{self, RichText};
 
+use crate::backends::labwc::{autostart, paths, GROUP};
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::t;
-use crate::labwc::{autostart, paths};
-use crate::modules::{Category, ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
+use crate::modules::{ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
 use crate::ui::theme;
 use crate::wlr::{self, Mode, OutputInfo};
 
-pub const MODULE_ID: &str = crate::modules::DEFAULT_DISPLAY_MODULE_ID;
+pub const MODULE_ID: &str = crate::modules::DISPLAY_PERSIST_MODULE_ID;
 const TASK_ID: &str = "display-default";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,7 +20,7 @@ enum DisplayPersist {
     Static,
 }
 
-pub struct LabwcDisplayModule {
+pub struct DisplayPersistModule {
     autostart_path: PathBuf,
     autostart_raw: String,
     autostart_exists: bool,
@@ -33,7 +33,7 @@ pub struct LabwcDisplayModule {
     display_persist: DisplayPersist,
 }
 
-impl LabwcDisplayModule {
+impl DisplayPersistModule {
     pub fn new() -> Self {
         Self::with_path(paths::autostart())
     }
@@ -233,13 +233,13 @@ impl LabwcDisplayModule {
     }
 }
 
-impl SettingsModule for LabwcDisplayModule {
+impl SettingsModule for DisplayPersistModule {
     fn meta(&self) -> ModuleMeta {
         ModuleMeta {
             id: MODULE_ID,
             title_key: "default_display_configuration",
             subtitle_key: "default_display_subtitle",
-            category: Category::Labwc,
+            group: GROUP,
         }
     }
 
@@ -503,7 +503,7 @@ mod tests {
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let mut module = LabwcDisplayModule::with_path(autostart_path);
+        let mut module = DisplayPersistModule::with_path(autostart_path);
         module.display_persist = DisplayPersist::None;
         module.selected_output = Some("B".to_string());
         module.selected_mode = wlr::parse_spec("2x2@50.000000Hz");
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn detects_existing_persist_mode() {
         let (dir, autostart_path) = temp_paths();
-        let mut module = LabwcDisplayModule::with_path(autostart_path.clone());
+        let mut module = DisplayPersistModule::with_path(autostart_path.clone());
         assert_eq!(module.display_persist, DisplayPersist::None);
 
         std::fs::write(
@@ -530,7 +530,7 @@ mod tests {
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        module = LabwcDisplayModule::with_path(autostart_path);
+        module = DisplayPersistModule::with_path(autostart_path);
         assert_eq!(module.display_persist, DisplayPersist::Static);
         assert_eq!(module.selected_output.as_deref(), Some("A"));
         assert_eq!(
@@ -549,7 +549,7 @@ mod tests {
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let module = LabwcDisplayModule::with_path(autostart_path);
+        let module = DisplayPersistModule::with_path(autostart_path);
         let (output, mode) = module.saved_default().unwrap();
         assert_eq!(output, "A");
         assert_eq!(mode.spec(), "1x1@60.000000Hz");
@@ -559,7 +559,7 @@ mod tests {
     #[test]
     fn display_default_writes_autostart() {
         let (dir, autostart) = temp_paths();
-        let mut module = LabwcDisplayModule::with_path(autostart);
+        let mut module = DisplayPersistModule::with_path(autostart);
         module.selected_output = Some("HDMI-A-1".to_string());
         module.selected_mode = Some(wlr::parse_spec("1920x1080@60.000000Hz").unwrap());
         module.display_persist = DisplayPersist::Static;
@@ -593,7 +593,7 @@ mod tests {
             autostart::contents("foo\n", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let mut module = LabwcDisplayModule::with_path(autostart_path.clone());
+        let mut module = DisplayPersistModule::with_path(autostart_path.clone());
         module.display_persist = DisplayPersist::None;
 
         let tasks = module.pending();
@@ -614,7 +614,7 @@ mod tests {
     #[test]
     fn handoff_prefills_selection() {
         let (dir, autostart) = temp_paths();
-        let mut module = LabwcDisplayModule::with_path(autostart);
+        let mut module = DisplayPersistModule::with_path(autostart);
         module.on_message(&ModulePayload::DisplayDefault {
             output: "HDMI-A-1".to_string(),
             spec: "1920x1080@60.000000Hz".to_string(),

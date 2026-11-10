@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::labwc::{environment, paths, rc_xml};
-use crate::modules::{ConfigEdit, ConfigTarget};
+use crate::backends::labwc::{environment, paths, rc_xml, ENVIRONMENT_FILE, RC_XML_FILE};
+use crate::modules::ConfigEdit;
 
 #[derive(Clone, Copy)]
 pub struct Spec {
@@ -130,7 +130,7 @@ impl ScalarState {
                 continue;
             }
             edits.push(ConfigEdit {
-                target: ConfigTarget::RcXml,
+                file_id: RC_XML_FILE,
                 key: spec.path.to_string(),
                 value: Some(value.clone()),
                 summary: format!("{} = {}", short_path(spec.path), value),
@@ -242,7 +242,7 @@ impl EnvState {
                 None => format!("-{}", key),
             };
             edits.push(ConfigEdit {
-                target: ConfigTarget::Environment,
+                file_id: ENVIRONMENT_FILE,
                 key: (*key).to_string(),
                 value: desired,
                 summary,

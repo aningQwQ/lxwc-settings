@@ -3,12 +3,10 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 
+use crate::backends::labwc::{environment, paths, ENVIRONMENT_FILE, GROUP};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::labwc::{environment, paths};
-use crate::modules::{
-    Category, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, ENVIRONMENT_TASK_ID,
-};
+use crate::modules::{ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule};
 use crate::ui::theme;
 
 struct ManagedEnv {
@@ -88,7 +86,7 @@ impl EnvModule {
         })
     }
 
-    fn patch(&self, raw: &str) -> Option<PatchOutcome> {
+    fn compute_patch(&self, raw: &str) -> Option<PatchOutcome> {
         let mut sets = BTreeMap::new();
         let mut unsets = Vec::new();
         let mut changes = Vec::new();
@@ -129,7 +127,7 @@ impl SettingsModule for EnvModule {
             id: "env",
             title_key: "environment_tweaks",
             subtitle_key: "edit_labwc_environment_for_streaming_and_compatibility_switches",
-            category: Category::Labwc,
+            group: GROUP,
         }
     }
 
@@ -137,8 +135,11 @@ impl SettingsModule for EnvModule {
         self.reload(true);
     }
 
-    fn environment_patch(&mut self, raw: &str) -> Result<Option<PatchOutcome>, String> {
-        Ok(self.patch(raw))
+    fn patch(&mut self, file_id: &'static str, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        if file_id != ENVIRONMENT_FILE {
+            return Ok(None);
+        }
+        Ok(self.compute_patch(raw))
     }
 
     fn on_applied(&mut self, _report: &ApplyReport) {
@@ -164,7 +165,7 @@ impl SettingsModule for EnvModule {
         }
 
         if self.has_changes() {
-            if let Some(err) = ctx.failures.get(ENVIRONMENT_TASK_ID) {
+            if let Some(err) = ctx.failures.get(ENVIRONMENT_FILE) {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }
         }
@@ -226,8 +227,8 @@ mod tests {
     fn report(ok: bool) -> ApplyReport {
         ApplyReport {
             results: vec![TaskResult {
-                id: ENVIRONMENT_TASK_ID.to_string(),
-                module_id: ENVIRONMENT_TASK_ID,
+                id: ENVIRONMENT_FILE.to_string(),
+                module_id: ENVIRONMENT_FILE,
                 title: "environment".to_string(),
                 change_count: 1,
                 ok,
@@ -277,7 +278,7 @@ mod tests {
             .insert("WLR_NO_HARDWARE_CURSORS", Some("1".to_string()));
 
         let raw = module.raw.clone();
-        let patch = module.environment_patch(&raw).unwrap().unwrap();
+        let patch = module.patch(ENVIRONMENT_FILE, &raw).unwrap().unwrap();
         assert_eq!(patch.count, 2);
         assert!(patch.contents.contains("WLR_DRM_NO_MODIFIERS=1"));
         assert!(patch.contents.contains("WLR_NO_HARDWARE_CURSORS=1"));

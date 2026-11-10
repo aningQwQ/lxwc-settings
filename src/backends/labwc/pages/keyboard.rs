@@ -1,13 +1,11 @@
 use eframe::egui::{self, RichText};
 
+use crate::backends::labwc::layouts::{self, Layout, LayoutEntry};
+use crate::backends::labwc::pages::scalar::{EnvState, ScalarState, Spec};
+use crate::backends::labwc::{ENVIRONMENT_FILE, GROUP, RC_XML_FILE};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::labwc::layouts::{self, Layout, LayoutEntry};
-use crate::modules::scalar::{EnvState, ScalarState, Spec};
-use crate::modules::{
-    Category, ConfigEdit, ModuleCtx, ModuleMeta, SettingsModule, ENVIRONMENT_TASK_ID,
-    RC_XML_TASK_ID,
-};
+use crate::modules::{ConfigEdit, ModuleCtx, ModuleMeta, SettingsModule};
 use crate::ui::theme;
 
 const MODULE_ID: &str = "keyboard";
@@ -107,7 +105,7 @@ impl SettingsModule for KeyboardModule {
             id: MODULE_ID,
             title_key: "keyboard",
             subtitle_key: "keyboard_subtitle",
-            category: Category::Labwc,
+            group: GROUP,
         }
     }
 
@@ -124,15 +122,15 @@ impl SettingsModule for KeyboardModule {
     }
 
     fn on_applied(&mut self, report: &ApplyReport) {
-        if report.task_succeeded(RC_XML_TASK_ID, RC_XML_TASK_ID) {
+        if report.file_succeeded(RC_XML_FILE) {
             self.rc.commit();
-        } else if report.task_failed(RC_XML_TASK_ID, RC_XML_TASK_ID) {
+        } else if report.file_failed(RC_XML_FILE) {
             self.rc.sync_after_apply();
         }
-        if report.task_succeeded(ENVIRONMENT_TASK_ID, ENVIRONMENT_TASK_ID) {
+        if report.file_succeeded(ENVIRONMENT_FILE) {
             self.env.commit();
             self.load_fields();
-        } else if report.task_failed(ENVIRONMENT_TASK_ID, ENVIRONMENT_TASK_ID) {
+        } else if report.file_failed(ENVIRONMENT_FILE) {
             self.env.sync_after_apply();
             self.load_fields();
         }
@@ -144,8 +142,8 @@ impl SettingsModule for KeyboardModule {
         } else if self.rc.has_changes() || self.env.has_changes() {
             if let Some(err) = ctx
                 .failures
-                .get(RC_XML_TASK_ID)
-                .or_else(|| ctx.failures.get(ENVIRONMENT_TASK_ID))
+                .get(RC_XML_FILE)
+                .or_else(|| ctx.failures.get(ENVIRONMENT_FILE))
             {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }

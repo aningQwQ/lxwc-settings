@@ -105,24 +105,33 @@ cargo install --path .
 
 ```text
 src/
-  app.rs          模块路由、任务聚合、确认与应用状态
-  core/           领域模型：Effect、Task、TaskResult、ApplyReport
-  services/       通用文件事务和后台 worker
+  app.rs          后端驱动的任务聚合、确认与应用状态
+  backend.rs      外壳消费的后端/分组描述
+  backends/       每个合成器一个目录：适配器、配置格式、页面
+    labwc/        rc.xml、environment、autostart、XKB、快捷键与 Labwc 页面
+    mod.rs        探测、工厂、页面注册
+  config/         ConfigFile / ConfigFormat / ConfigEdit / PatchOutcome
+  modules/        所有页面共用的 SettingsModule 契约
+  pages/          与具体合成器无关的页面
   wlr/            WLR 适配器：wlr-randr 扫描、解析、模式命令
-  labwc/          Labwc 适配器：rc.xml、environment、autostart、路径、重载
   plugins/        无 UI 的预设，例如 LXQt 命令
-  modules/        各设置页面的 UI 与业务状态
+  services/       通用文件事务和后台 worker
+  core/           领域模型：Effect、Task、TaskResult、ApplyReport
   ui/             侧边栏、状态栏和主题
   i18n.rs         运行时翻译加载
 ```
 
 依赖方向：
 
-- `core` 不依赖 UI 或系统适配器。
-- `wlr` 和 `labwc` 是平级的外部系统适配器。
-- `modules` 只包含 UI 与状态，不直接写文件。
-- `app` 负责收集任务和分发模块请求。
-- 持久化统一使用 `Effect::WriteFile`。
+- `core` 与 `config` 不认识页面、UI 或具体合成器。
+- `backends/<id>` 拥有路径、文件格式、重载命令和它自己的页面。
+- `pages/` 存放合成器无关页面，不得 import `backends/`。
+- `modules/` 只是页面契约：页面只声明后端文件 id，不出现路径。
+- `app` 读取后端文件清单，按文件聚合任务，并分发页面请求。
+- 持久化统一使用 `Effect::WriteFile` / `Effect::RunCommand`。
+- `src/architecture_tests.rs` 在测试期强制这些依赖方向。
+
+`LXWC_BACKEND` 可强制指定后端；目前只有一个后端时默认 `labwc`。
 
 ## 测试
 

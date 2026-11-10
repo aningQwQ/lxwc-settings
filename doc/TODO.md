@@ -4,6 +4,12 @@ No outstanding core tasks.
 
 ## Completed
 
+- Backend-oriented layout: `config/` contract, `backends/<id>/` adapters and pages,
+  compositor-neutral `pages/`, and `backends::detect()`/registry with `LXWC_BACKEND`.
+- `SettingsModule` takes `ConfigEdit.file_id` and a single `patch(file_id, raw)` hook;
+  `app` aggregates one task per backend file instead of two hardcoded files.
+- Architecture tests enforce page/backend/adapter dependency directions.
+
 - Appearance, window behaviour, mouse/touchpad, keyboard, and touchscreen settings.
 - Custom pointer acceleration curves.
 - `layout(variant)` XKB merge with `XKB_DEFAULT_VARIANT` cleared.

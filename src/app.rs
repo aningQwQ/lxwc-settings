@@ -1,21 +1,19 @@
-use std::collections::{BTreeMap, HashMap};
-use std::path::Path;
-
 use eframe::egui;
+use std::collections::HashMap;
 
+use crate::backend::Backend;
+use crate::backends;
+use crate::config::ConfigEdit;
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::{self, t, Lang};
-use crate::labwc::{environment, paths, rc_xml, reconfigure};
-use crate::modules::{
-    self, ConfigTarget, ModuleCtx, SettingsModule, StatusMessage, ENVIRONMENT_TASK_ID,
-    RC_XML_TASK_ID,
-};
+use crate::modules::{ModuleCtx, SettingsModule, StatusMessage};
 use crate::services::fs;
 use crate::services::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::ui::{sidebar, status_bar, theme};
 
 pub struct App {
     worker: WorkerHandle,
+    pub backend: Backend,
     pub modules: Vec<Box<dyn SettingsModule>>,
     pub current: usize,
     pub lang: Lang,
@@ -33,17 +31,8 @@ impl App {
         let lang = i18n::initial();
         i18n::set_current(lang);
 
-        let mut modules: Vec<Box<dyn SettingsModule>> = vec![
-            Box::new(modules::display::DisplayModule::new(ctx)),
-            Box::new(modules::appearance::AppearanceModule::new()),
-            Box::new(modules::behaviour::BehaviourModule::new()),
-            Box::new(modules::mouse::MouseModule::new()),
-            Box::new(modules::keyboard::KeyboardModule::new()),
-            Box::new(modules::touchscreen::TouchscreenModule::new()),
-            Box::new(modules::keybind::KeybindModule::new()),
-            Box::new(modules::labwc_display::LabwcDisplayModule::new()),
-            Box::new(modules::env::EnvModule::new()),
-        ];
+        let backend = backends::create(backends::detect());
+        let mut modules = backends::modules(backend.id, ctx);
         for module in &mut modules {
             module.refresh();
         }
@@ -51,6 +40,7 @@ impl App {
         let worker = WorkerHandle::spawn(ctx.clone());
         Self {
             worker,
+            backend,
             modules,
             current: 0,
             lang,
@@ -70,8 +60,7 @@ impl App {
             tasks.extend(module.pending());
         }
 
-        let (file_tasks, error) =
-            collect_file_tasks(&mut self.modules, &paths::rc_xml(), &paths::environment());
+        let (file_tasks, error) = collect_file_tasks(&mut self.modules, &self.backend);
         tasks.extend(file_tasks);
 
         if let Some(error) = error {
@@ -254,170 +243,149 @@ impl App {
     }
 }
 
+/// Aggregate every page's intent into one task per backend file.
+///
+/// The loop knows nothing about file formats or paths: it reads the backend's
+/// file list, asks each format to apply the collected edits, then runs the
+/// page-specific `patch` hooks.
 fn collect_file_tasks(
     modules: &mut [Box<dyn SettingsModule>],
-    rc_path: &Path,
-    env_path: &Path,
+    backend: &Backend,
 ) -> (Vec<Task>, Option<String>) {
-    let mut tasks = Vec::new();
+    struct FileState {
+        raw: String,
+        expected: Option<String>,
+        summaries: Vec<String>,
+        counts: HashMap<&'static str, usize>,
+    }
+
     let mut errors = Vec::new();
+    let mut states = Vec::with_capacity(backend.files.len());
+    for file in &backend.files {
+        let (raw, exists) = match fs::read_optional(&file.path) {
+            Ok(value) => value,
+            Err(err) => {
+                errors.push(err);
+                (String::new(), false)
+            }
+        };
+        states.push(FileState {
+            expected: exists.then(|| raw.clone()),
+            raw,
+            summaries: Vec::new(),
+            counts: HashMap::new(),
+        });
+    }
 
-    let (mut rc_raw, rc_exists) = match fs::read_optional(rc_path) {
-        Ok(value) => value,
-        Err(err) => {
-            errors.push(err);
-            (String::new(), false)
-        }
-    };
-    let (mut env_raw, env_exists) = match fs::read_optional(env_path) {
-        Ok(value) => value,
-        Err(err) => {
-            errors.push(err);
-            (String::new(), false)
-        }
-    };
-    let rc_expected = rc_exists.then(|| rc_raw.clone());
-    let env_expected = env_exists.then(|| env_raw.clone());
-
-    let mut rc_summaries = Vec::new();
-    let mut env_summaries = Vec::new();
-    let mut rc_counts: HashMap<&'static str, usize> = HashMap::new();
-    let mut env_counts: HashMap<&'static str, usize> = HashMap::new();
-    let mut env_sets = BTreeMap::new();
-    let mut env_unsets = Vec::new();
-    let mut active_env = environment::parse_active(&env_raw);
-
+    let mut per_file: Vec<Vec<(&'static str, ConfigEdit)>> =
+        backend.files.iter().map(|_| Vec::new()).collect();
     for module in modules.iter_mut() {
         let module_id = module.meta().id;
         for edit in module.config_edits() {
-            match edit.target {
-                ConfigTarget::RcXml => {
-                    let current = rc_xml::get(&rc_raw, &edit.key);
-                    let unchanged = match &edit.value {
-                        Some(value) => current.as_deref() == Some(value.as_str()),
-                        None => current.is_none(),
-                    };
-                    if unchanged {
-                        continue;
-                    }
-                    let result = match &edit.value {
-                        Some(value) => rc_xml::set(&rc_raw, &edit.key, value),
-                        None => rc_xml::remove(&rc_raw, &edit.key),
-                    };
-                    match result {
-                        Ok(next) => {
-                            rc_raw = next;
-                            rc_summaries.push(edit.summary);
-                            *rc_counts.entry(module_id).or_default() += 1;
-                        }
-                        Err(err) => errors.push(err),
-                    }
-                }
-                ConfigTarget::Environment => {
-                    let current = active_env.get(&edit.key).cloned();
-                    let unchanged = match &edit.value {
-                        Some(value) => current.as_deref() == Some(value.as_str()),
-                        None => current.is_none(),
-                    };
-                    if unchanged {
-                        continue;
-                    }
-                    match edit.value {
-                        Some(value) => {
-                            env_sets.insert(edit.key.clone(), value.clone());
-                            active_env.insert(edit.key.clone(), value);
-                        }
-                        None => {
-                            if !env_unsets.iter().any(|key| key == &edit.key) {
-                                env_unsets.push(edit.key.clone());
-                            }
-                            active_env.remove(&edit.key);
-                        }
-                    }
-                    env_summaries.push(edit.summary);
-                    *env_counts.entry(module_id).or_default() += 1;
-                }
+            match backend
+                .files
+                .iter()
+                .position(|file| file.id == edit.file_id)
+            {
+                Some(index) => per_file[index].push((module_id, edit)),
+                None => errors.push(format!("unknown config file id: {}", edit.file_id)),
             }
         }
     }
 
-    if !env_sets.is_empty() || !env_unsets.is_empty() {
-        env_raw = environment::patch(&env_raw, &env_sets, &env_unsets);
+    for (index, edits) in per_file.into_iter().enumerate() {
+        if edits.is_empty() {
+            continue;
+        }
+        let plain = edits
+            .iter()
+            .map(|(_, edit)| edit.clone())
+            .collect::<Vec<_>>();
+        match backend.files[index]
+            .format
+            .apply(&states[index].raw, &plain)
+        {
+            Ok(applied) => {
+                let mut changed = false;
+                for ((module_id, edit), is_changed) in edits.iter().zip(applied.changed.iter()) {
+                    if !is_changed {
+                        continue;
+                    }
+                    states[index].summaries.push(edit.summary.clone());
+                    *states[index].counts.entry(*module_id).or_default() += 1;
+                    changed = true;
+                }
+                if changed {
+                    states[index].raw = applied.contents;
+                }
+            }
+            Err(err) => errors.push(err),
+        }
     }
 
     for module in modules.iter_mut() {
         let module_id = module.meta().id;
-
-        match module.rc_xml_patch(&rc_raw) {
-            Ok(Some(patch)) => {
-                if patch.count > 0 {
-                    rc_raw = patch.contents;
-                    rc_summaries.push(patch.summary);
-                    *rc_counts.entry(module_id).or_default() += patch.count;
+        for (index, file) in backend.files.iter().enumerate() {
+            match module.patch(file.id, &states[index].raw) {
+                Ok(Some(patch)) => {
+                    if patch.count > 0 {
+                        states[index].raw = patch.contents;
+                        states[index].summaries.push(patch.summary);
+                        *states[index].counts.entry(module_id).or_default() += patch.count;
+                    }
                 }
+                Ok(None) => {}
+                Err(err) => errors.push(err),
             }
-            Ok(None) => {}
-            Err(err) => errors.push(err),
-        }
-
-        match module.environment_patch(&env_raw) {
-            Ok(Some(patch)) => {
-                if patch.count > 0 {
-                    env_raw = patch.contents;
-                    env_summaries.push(patch.summary);
-                    *env_counts.entry(module_id).or_default() += patch.count;
-                }
-            }
-            Ok(None) => {}
-            Err(err) => errors.push(err),
         }
     }
 
-    let rc_count: usize = rc_counts.values().sum();
-    let env_count: usize = env_counts.values().sum();
-    let mut rc_attribution = rc_counts.into_iter().collect::<Vec<_>>();
-    let mut env_attribution = env_counts.into_iter().collect::<Vec<_>>();
-    rc_attribution.sort_by_key(|(module_id, _)| *module_id);
-    env_attribution.sort_by_key(|(module_id, _)| *module_id);
+    let mut tasks = Vec::new();
+    for (index, file) in backend.files.iter().enumerate() {
+        let state = &mut states[index];
+        let count: usize = state.counts.values().sum();
+        if count == 0 {
+            continue;
+        }
+        let mut attribution = state
+            .counts
+            .iter()
+            .map(|(module_id, count)| (*module_id, *count))
+            .collect::<Vec<_>>();
+        attribution.sort_by_key(|(module_id, _)| *module_id);
 
-    if rc_count > 0 {
-        let command = reconfigure::command();
         tasks.push(Task {
-            id: RC_XML_TASK_ID.to_string(),
-            module_id: RC_XML_TASK_ID,
-            title: crate::trf!("rc_xml_changes", rc_count),
-            detail: rc_summaries.join("; "),
-            change_count: rc_count,
-            attribution: rc_attribution,
-            effects: vec![
-                Effect::WriteFile {
-                    path: rc_path.to_path_buf(),
-                    contents: rc_raw,
-                    expected: rc_expected,
-                },
-                Effect::RunCommand {
-                    program: command.program,
-                    args: command.args,
-                    best_effort: true,
-                },
-            ],
-        });
-    }
-
-    if env_count > 0 {
-        tasks.push(Task {
-            id: ENVIRONMENT_TASK_ID.to_string(),
-            module_id: ENVIRONMENT_TASK_ID,
-            title: crate::trf!("environment_changes", env_count),
-            detail: env_summaries.join("; "),
-            change_count: env_count,
-            attribution: env_attribution,
+            id: file.id.to_string(),
+            module_id: file.id,
+            title: i18n::format_template(t(file.title_key), &[&count]),
+            detail: state.summaries.join("; "),
+            change_count: count,
+            attribution,
             effects: vec![Effect::WriteFile {
-                path: env_path.to_path_buf(),
-                contents: env_raw,
-                expected: env_expected,
+                path: file.path.clone(),
+                contents: std::mem::take(&mut state.raw),
+                expected: state.expected.clone(),
             }],
         });
+    }
+
+    if let Some(command) = &backend.reload {
+        let reload_file = backend
+            .files
+            .iter()
+            .rev()
+            .find(|file| file.needs_reload)
+            .map(|file| file.id);
+        if let Some(task) = tasks
+            .iter_mut()
+            .find(|task| Some(task.id.as_str()) == reload_file)
+        {
+            task.effects.push(Effect::RunCommand {
+                program: command.program.clone(),
+                args: command.args.clone(),
+                best_effort: true,
+            });
+        }
     }
 
     (tasks, errors.into_iter().next())
@@ -512,7 +480,10 @@ impl eframe::App for App {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::{ConfigEdit, ConfigTarget, ModuleMeta};
+    use crate::backend::{Group, GROUP_OUTPUT};
+    use crate::backends::labwc;
+    use crate::config::{CommandSpec, ConfigFile};
+    use crate::modules::ModuleMeta;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -527,7 +498,7 @@ mod tests {
                 id: self.id,
                 title_key: "appearance",
                 subtitle_key: "appearance_subtitle",
-                category: crate::modules::Category::Labwc,
+                group: GROUP_OUTPUT,
             }
         }
 
@@ -542,9 +513,9 @@ mod tests {
         }
     }
 
-    fn edit(target: ConfigTarget, key: &str, value: &str) -> ConfigEdit {
+    fn edit(file_id: &'static str, key: &str, value: &str) -> ConfigEdit {
         ConfigEdit {
-            target,
+            file_id,
             key: key.to_string(),
             value: Some(value.to_string()),
             summary: format!("{} = {}", key, value),
@@ -561,30 +532,57 @@ mod tests {
         dir
     }
 
+    fn test_backend(rc_path: PathBuf, env_path: PathBuf) -> Backend {
+        Backend {
+            id: "test",
+            groups: vec![Group {
+                id: GROUP_OUTPUT,
+                label_key: "wlr_module",
+            }],
+            files: vec![
+                ConfigFile {
+                    id: labwc::RC_XML_FILE,
+                    path: rc_path,
+                    format: &labwc::formats::RC_XML,
+                    title_key: "rc_xml_changes",
+                    needs_reload: true,
+                },
+                ConfigFile {
+                    id: labwc::ENVIRONMENT_FILE,
+                    path: env_path,
+                    format: &labwc::formats::ENVIRONMENT,
+                    title_key: "environment_changes",
+                    needs_reload: false,
+                },
+            ],
+            reload: Some(CommandSpec {
+                program: "true".to_string(),
+                args: Vec::new(),
+            }),
+        }
+    }
+
     #[test]
     fn aggregates_rc_and_environment_writes_once() {
         let dir = temp_dir();
         let rc_path = dir.join("rc.xml");
         let env_path = dir.join("environment");
+        let backend = test_backend(rc_path.clone(), env_path.clone());
 
         let mut modules: Vec<Box<dyn SettingsModule>> = vec![
             Box::new(FakeModule {
                 id: "appearance",
                 edits: vec![
-                    edit(
-                        ConfigTarget::RcXml,
-                        "/labwc_config/theme/cornerRadius",
-                        "12",
-                    ),
-                    edit(ConfigTarget::Environment, "XKB_DEFAULT_LAYOUT", "us"),
+                    edit(labwc::RC_XML_FILE, "/labwc_config/theme/cornerRadius", "12"),
+                    edit(labwc::ENVIRONMENT_FILE, "XKB_DEFAULT_LAYOUT", "us"),
                 ],
             }),
             Box::new(FakeModule {
                 id: "behaviour",
                 edits: vec![
-                    edit(ConfigTarget::RcXml, "/labwc_config/core/gap", "6"),
+                    edit(labwc::RC_XML_FILE, "/labwc_config/core/gap", "6"),
                     edit(
-                        ConfigTarget::Environment,
+                        labwc::ENVIRONMENT_FILE,
                         "XKB_DEFAULT_OPTIONS",
                         "grp:alt_shift_toggle",
                     ),
@@ -592,12 +590,12 @@ mod tests {
             }),
         ];
 
-        let (tasks, error) = collect_file_tasks(&mut modules, &rc_path, &env_path);
+        let (tasks, error) = collect_file_tasks(&mut modules, &backend);
         assert!(error.is_none());
 
         let rc_tasks = tasks
             .iter()
-            .filter(|task| task.id == RC_XML_TASK_ID)
+            .filter(|task| task.id == labwc::RC_XML_FILE)
             .collect::<Vec<_>>();
         assert_eq!(rc_tasks.len(), 1);
         assert_eq!(rc_tasks[0].change_count, 2);
@@ -612,13 +610,21 @@ mod tests {
         };
         assert!(contents.contains("<cornerRadius>12</cornerRadius>"));
         assert!(contents.contains("<gap>6</gap>"));
+        assert!(rc_tasks[0]
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::RunCommand { .. })));
 
         let env_tasks = tasks
             .iter()
-            .filter(|task| task.id == ENVIRONMENT_TASK_ID)
+            .filter(|task| task.id == labwc::ENVIRONMENT_FILE)
             .collect::<Vec<_>>();
         assert_eq!(env_tasks.len(), 1);
         assert_eq!(env_tasks[0].change_count, 2);
+        assert!(env_tasks[0]
+            .effects
+            .iter()
+            .all(|effect| matches!(effect, Effect::WriteFile { .. })));
         let Effect::WriteFile { contents, .. } = &env_tasks[0].effects[0] else {
             panic!("expected environment write");
         };
@@ -635,6 +641,27 @@ mod tests {
             1
         );
         assert!(!contents.contains("# added by lxwc-settings"));
+
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn unchanged_edits_do_not_create_tasks() {
+        let dir = temp_dir();
+        let rc_path = dir.join("rc.xml");
+        let env_path = dir.join("environment");
+        std::fs::write(&rc_path, "<labwc_config/>").unwrap();
+        let backend = test_backend(rc_path, env_path);
+
+        let mut modules: Vec<Box<dyn SettingsModule>> = vec![Box::new(FakeModule {
+            id: "behaviour",
+            edits: vec![edit(labwc::ENVIRONMENT_FILE, "XKB_DEFAULT_LAYOUT", "us")],
+        })];
+
+        let (tasks, error) = collect_file_tasks(&mut modules, &backend);
+        assert!(error.is_none());
+        assert_eq!(tasks.len(), 1);
+        assert_eq!(tasks[0].id, labwc::ENVIRONMENT_FILE);
 
         std::fs::remove_dir_all(dir).ok();
     }

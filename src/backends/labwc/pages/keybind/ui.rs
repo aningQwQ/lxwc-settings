@@ -2,11 +2,11 @@ use eframe::egui::{self, RichText};
 
 use super::types::*;
 use super::KeybindModule;
+use crate::backends::labwc::actions::{known_action_label, ACTION_SUGGESTIONS};
+use crate::backends::labwc::keycombo::{parse_parts, toggle_base_key, toggle_modifier};
+use crate::backends::labwc::rc_xml;
+use crate::backends::labwc::rc_xml::{KeybindAction, KeybindEntry};
 use crate::i18n::t;
-use crate::labwc::actions::{known_action_label, ACTION_SUGGESTIONS};
-use crate::labwc::keycombo::{parse_parts, toggle_base_key, toggle_modifier};
-use crate::labwc::rc_xml;
-use crate::labwc::rc_xml::{KeybindAction, KeybindEntry};
 use crate::modules::ModuleCtx;
 use crate::ui::theme;
 
@@ -268,7 +268,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
             module.discard_edit(&edit);
         }
 
-        if let Some(err) = ctx.failures.get(crate::modules::RC_XML_TASK_ID) {
+        if let Some(err) = ctx.failures.get(crate::backends::labwc::RC_XML_FILE) {
             ui.colored_label(theme::DANGER, RichText::new(err).small());
         }
 

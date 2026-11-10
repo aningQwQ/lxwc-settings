@@ -5,13 +5,11 @@ use std::path::PathBuf;
 
 use eframe::egui;
 
+use crate::backends::labwc::rc_xml::{KeybindAction, KeybindEntry};
+use crate::backends::labwc::{paths, rc_xml, GROUP, RC_XML_FILE};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::labwc::rc_xml::{KeybindAction, KeybindEntry};
-use crate::labwc::{paths, rc_xml};
-use crate::modules::{
-    Category, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, RC_XML_TASK_ID,
-};
+use crate::modules::{ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule};
 
 use types::*;
 
@@ -346,7 +344,7 @@ impl SettingsModule for KeybindModule {
             title_key: "global_shortcuts",
             subtitle_key:
                 "type_any_keysym_combination_and_action_and_edit_rc_xml_keybindings_directly",
-            category: Category::Labwc,
+            group: GROUP,
         }
     }
 
@@ -354,8 +352,8 @@ impl SettingsModule for KeybindModule {
         self.reload_rc(true);
     }
 
-    fn rc_xml_patch(&mut self, raw: &str) -> Result<Option<PatchOutcome>, String> {
-        if !self.exists {
+    fn patch(&mut self, file_id: &'static str, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        if file_id != RC_XML_FILE || !self.exists {
             return Ok(None);
         }
 
@@ -438,8 +436,8 @@ impl SettingsModule for KeybindModule {
     }
 
     fn on_applied(&mut self, report: &ApplyReport) {
-        let keybind_ok = report.task_succeeded(RC_XML_TASK_ID, RC_XML_TASK_ID);
-        let keybind_failed = report.task_failed(RC_XML_TASK_ID, RC_XML_TASK_ID);
+        let keybind_ok = report.file_succeeded(RC_XML_FILE);
+        let keybind_failed = report.file_failed(RC_XML_FILE);
         if keybind_ok || keybind_failed {
             self.reload_rc(false);
             if keybind_ok {
@@ -506,8 +504,8 @@ mod tests {
     fn report(ok: bool) -> ApplyReport {
         ApplyReport {
             results: vec![TaskResult {
-                id: RC_XML_TASK_ID.to_string(),
-                module_id: RC_XML_TASK_ID,
+                id: RC_XML_FILE.to_string(),
+                module_id: RC_XML_FILE,
                 title: "keybind".to_string(),
                 change_count: 1,
                 ok,
@@ -529,7 +527,7 @@ mod tests {
         module.edits.push(edit("W-t"));
 
         let raw = module.raw.clone();
-        let patch = module.rc_xml_patch(&raw).unwrap().unwrap();
+        let patch = module.patch(RC_XML_FILE, &raw).unwrap().unwrap();
         assert_eq!(patch.count, 1);
         assert!(patch.contents.contains("key=\"W-t\""));
         std::fs::write(module.path.clone(), &patch.contents).unwrap();
@@ -537,7 +535,7 @@ mod tests {
         module.on_applied(&report(true));
         assert!(module.edits.is_empty());
         let raw = module.raw.clone();
-        assert!(module.rc_xml_patch(&raw).unwrap().is_none());
+        assert!(module.patch(RC_XML_FILE, &raw).unwrap().is_none());
 
         std::fs::remove_dir_all(dir).ok();
     }
@@ -567,7 +565,7 @@ mod tests {
         module.on_applied(&report(false));
         assert_eq!(module.edits.len(), 1);
         let raw = module.raw.clone();
-        assert!(module.rc_xml_patch(&raw).unwrap().is_some());
+        assert!(module.patch(RC_XML_FILE, &raw).unwrap().is_some());
 
         std::fs::remove_dir_all(dir).ok();
     }

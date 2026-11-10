@@ -2,7 +2,6 @@ use eframe::egui::{self, RichText};
 
 use crate::app::App;
 use crate::i18n::{self, t, Lang};
-use crate::modules::Category;
 
 pub fn show(app: &mut App, ctx: &egui::Context) {
     egui::SidePanel::left("sidebar")
@@ -39,12 +38,12 @@ pub fn show(app: &mut App, ctx: &egui::Context) {
             ui.add_space(6.0);
             ui.separator();
 
-            for category in Category::ALL {
+            for group in &app.backend.groups {
                 ui.add_space(8.0);
-                ui.label(RichText::new(category.label()).small().weak());
+                ui.label(RichText::new(t(group.label_key)).small().weak());
                 for (index, module) in app.modules.iter().enumerate() {
                     let meta = module.meta();
-                    if meta.category != category {
+                    if meta.group != group.id {
                         continue;
                     }
                     let count: usize = app

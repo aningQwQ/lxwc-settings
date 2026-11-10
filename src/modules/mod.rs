@@ -3,57 +3,11 @@ use std::collections::HashMap;
 use eframe::egui;
 
 use crate::core::model::{ApplyReport, Task};
-use crate::i18n::t;
 
-pub const RC_XML_TASK_ID: &str = "rc-xml";
-pub const ENVIRONMENT_TASK_ID: &str = "environment";
-pub const DEFAULT_DISPLAY_MODULE_ID: &str = "labwc-display";
+pub use crate::config::{ConfigEdit, PatchOutcome};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConfigTarget {
-    RcXml,
-    Environment,
-}
-
-#[derive(Clone, Debug)]
-pub struct ConfigEdit {
-    pub target: ConfigTarget,
-    pub key: String,
-    pub value: Option<String>,
-    pub summary: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct PatchOutcome {
-    pub contents: String,
-    pub summary: String,
-    pub count: usize,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Category {
-    Wlr,
-    Labwc,
-}
-
-impl Category {
-    pub const ALL: [Category; 2] = [Category::Wlr, Category::Labwc];
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Category::Wlr => t("wlr_module"),
-            Category::Labwc => t("labwc_module"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct ModuleMeta {
-    pub id: &'static str,
-    pub title_key: &'static str,
-    pub subtitle_key: &'static str,
-    pub category: Category,
-}
+/// Module id of the page that persists a default display for the backend.
+pub const DISPLAY_PERSIST_MODULE_ID: &str = "display-persist";
 
 #[derive(Clone, Debug)]
 pub struct StatusMessage {
@@ -102,6 +56,19 @@ impl ModuleCtx<'_> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct ModuleMeta {
+    pub id: &'static str,
+    pub title_key: &'static str,
+    pub subtitle_key: &'static str,
+    /// Sidebar group id, resolved against the active backend's groups.
+    pub group: &'static str,
+}
+
+/// Contract between the application shell and a settings page.
+///
+/// Pages describe intent. They never know file paths, formats or commands:
+/// edits name a backend file id and patches return text.
 pub trait SettingsModule {
     fn meta(&self) -> ModuleMeta;
     fn refresh(&mut self);
@@ -119,11 +86,15 @@ pub trait SettingsModule {
         Vec::new()
     }
 
-    fn rc_xml_patch(&mut self, _raw: &str) -> Result<Option<PatchOutcome>, String> {
-        Ok(None)
-    }
-
-    fn environment_patch(&mut self, _raw: &str) -> Result<Option<PatchOutcome>, String> {
+    /// Page-specific patch step for one backend file.
+    ///
+    /// Used where a plain key/value edit cannot express the change, such as
+    /// keybind entries or pointer curves.
+    fn patch(
+        &mut self,
+        _file_id: &'static str,
+        _raw: &str,
+    ) -> Result<Option<PatchOutcome>, String> {
         Ok(None)
     }
 
@@ -133,15 +104,3 @@ pub trait SettingsModule {
 
     fn overlay(&mut self, _ui_ctx: &egui::Context, _ctx: &mut ModuleCtx) {}
 }
-
-mod scalar;
-
-pub mod appearance;
-pub mod behaviour;
-pub mod display;
-pub mod env;
-pub mod keybind;
-pub mod keyboard;
-pub mod labwc_display;
-pub mod mouse;
-pub mod touchscreen;

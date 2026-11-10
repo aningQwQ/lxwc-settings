@@ -1,8 +1,13 @@
 mod app;
+#[cfg(test)]
+mod architecture_tests;
+mod backend;
+mod backends;
+mod config;
 mod core;
 mod i18n;
-mod labwc;
 mod modules;
+mod pages;
 mod plugins;
 mod services;
 mod ui;

@@ -3,11 +3,11 @@ use std::time::{Duration, Instant};
 
 use eframe::egui::{self, RichText};
 
+use crate::backend::GROUP_OUTPUT;
 use crate::core::model::{ApplyReport, Task};
 use crate::i18n::t;
 use crate::modules::{
-    Category, ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule,
-    DEFAULT_DISPLAY_MODULE_ID,
+    ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule, DISPLAY_PERSIST_MODULE_ID,
 };
 use crate::ui::theme;
 use crate::wlr::worker::{self, Event as DisplayEvent, Request as DisplayRequest};
@@ -192,7 +192,7 @@ impl SettingsModule for DisplayModule {
             title_key: "display_output",
             subtitle_key:
                 "manage_outputs_directly_via_wlr_randr_with_a_15_second_rollback_watchdog",
-            category: Category::Wlr,
+            group: GROUP_OUTPUT,
         }
     }
 
@@ -534,7 +534,7 @@ impl SettingsModule for DisplayModule {
             let spec = watchdog.mode.spec();
             self.watchdog = None;
             ctx.requests.push(ModuleRequest {
-                target: DEFAULT_DISPLAY_MODULE_ID,
+                target: DISPLAY_PERSIST_MODULE_ID,
                 payload: ModulePayload::DisplayDefault { output, spec },
             });
             ctx.info(t("display_default_handed_off"));

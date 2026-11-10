@@ -1,7 +1,4 @@
-pub struct CommandSpec {
-    pub program: String,
-    pub args: Vec<String>,
-}
+use crate::config::CommandSpec;
 
 pub fn command() -> CommandSpec {
     CommandSpec {

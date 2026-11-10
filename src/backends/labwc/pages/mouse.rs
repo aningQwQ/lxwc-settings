@@ -1,14 +1,11 @@
 use eframe::egui::{self, RichText};
 
+use crate::backends::labwc::accel::{self, CurveError};
+use crate::backends::labwc::pages::scalar::{EnvState, ScalarState, Spec};
+use crate::backends::labwc::{rc_xml, themes, ENVIRONMENT_FILE, GROUP, RC_XML_FILE};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::labwc::accel::{self, CurveError};
-use crate::labwc::{rc_xml, themes};
-use crate::modules::scalar::{EnvState, ScalarState, Spec};
-use crate::modules::{
-    Category, ConfigEdit, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule, ENVIRONMENT_TASK_ID,
-    RC_XML_TASK_ID,
-};
+use crate::modules::{ConfigEdit, ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule};
 use crate::ui::theme;
 
 const MODULE_ID: &str = "mouse";
@@ -260,7 +257,7 @@ impl SettingsModule for MouseModule {
             id: MODULE_ID,
             title_key: "mouse_touchpad",
             subtitle_key: "mouse_touchpad_subtitle",
-            category: Category::Labwc,
+            group: GROUP,
         }
     }
 
@@ -282,20 +279,23 @@ impl SettingsModule for MouseModule {
         edits
     }
 
-    fn rc_xml_patch(&mut self, raw: &str) -> Result<Option<PatchOutcome>, String> {
+    fn patch(&mut self, file_id: &'static str, raw: &str) -> Result<Option<PatchOutcome>, String> {
+        if file_id != RC_XML_FILE {
+            return Ok(None);
+        }
         self.curves_patch(raw)
     }
 
     fn on_applied(&mut self, report: &ApplyReport) {
-        if report.task_succeeded(RC_XML_TASK_ID, RC_XML_TASK_ID) {
+        if report.file_succeeded(RC_XML_FILE) {
             self.rc.commit();
             self.load_curves();
-        } else if report.task_failed(RC_XML_TASK_ID, RC_XML_TASK_ID) {
+        } else if report.file_failed(RC_XML_FILE) {
             self.rc.sync_after_apply();
         }
-        if report.task_succeeded(ENVIRONMENT_TASK_ID, ENVIRONMENT_TASK_ID) {
+        if report.file_succeeded(ENVIRONMENT_FILE) {
             self.env.commit();
-        } else if report.task_failed(ENVIRONMENT_TASK_ID, ENVIRONMENT_TASK_ID) {
+        } else if report.file_failed(ENVIRONMENT_FILE) {
             self.env.sync_after_apply();
         }
     }
@@ -306,8 +306,8 @@ impl SettingsModule for MouseModule {
         } else if self.rc.has_changes() || self.env.has_changes() {
             if let Some(err) = ctx
                 .failures
-                .get(RC_XML_TASK_ID)
-                .or_else(|| ctx.failures.get(ENVIRONMENT_TASK_ID))
+                .get(RC_XML_FILE)
+                .or_else(|| ctx.failures.get(ENVIRONMENT_FILE))
             {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }

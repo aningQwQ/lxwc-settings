@@ -1,9 +1,10 @@
 use eframe::egui::{self, RichText};
 
+use crate::backends::labwc::pages::scalar::{ScalarState, Spec};
+use crate::backends::labwc::{GROUP, RC_XML_FILE};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
-use crate::modules::scalar::{ScalarState, Spec};
-use crate::modules::{Category, ModuleCtx, ModuleMeta, SettingsModule, RC_XML_TASK_ID};
+use crate::modules::{ModuleCtx, ModuleMeta, SettingsModule};
 use crate::ui::theme;
 
 const MODULE_ID: &str = "touchscreen";
@@ -39,7 +40,7 @@ impl SettingsModule for TouchscreenModule {
             id: MODULE_ID,
             title_key: "touchscreen",
             subtitle_key: "touchscreen_subtitle",
-            category: Category::Labwc,
+            group: GROUP,
         }
     }
 
@@ -52,9 +53,9 @@ impl SettingsModule for TouchscreenModule {
     }
 
     fn on_applied(&mut self, report: &ApplyReport) {
-        if report.task_succeeded(RC_XML_TASK_ID, RC_XML_TASK_ID) {
+        if report.file_succeeded(RC_XML_FILE) {
             self.rc.commit();
-        } else if report.task_failed(RC_XML_TASK_ID, RC_XML_TASK_ID) {
+        } else if report.file_failed(RC_XML_FILE) {
             self.rc.sync_after_apply();
         }
     }
@@ -63,7 +64,7 @@ impl SettingsModule for TouchscreenModule {
         if let Some(err) = self.rc.error() {
             ui.colored_label(theme::DANGER, RichText::new(err).small());
         } else if self.rc.has_changes() {
-            if let Some(err) = ctx.failures.get(RC_XML_TASK_ID) {
+            if let Some(err) = ctx.failures.get(RC_XML_FILE) {
                 ui.colored_label(theme::DANGER, RichText::new(err).small());
             }
         }
