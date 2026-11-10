@@ -1,17 +1,19 @@
+// Shell-only builds keep kernel contract types that no plugin uses yet.
+#![cfg_attr(not(feature = "labwc"), allow(dead_code))]
+
 mod app;
 #[cfg(test)]
 mod architecture_tests;
 mod backend;
-mod backends;
 mod config;
 mod core;
 mod i18n;
 mod modules;
 mod pages;
+mod plugin;
 mod plugins;
 mod services;
 mod ui;
-mod wlr;
 
 use eframe::egui;
 

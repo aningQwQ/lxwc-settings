@@ -20,6 +20,7 @@ pub fn environment() -> PathBuf {
         .unwrap_or_else(|| config_dir().join("environment"))
 }
 
+#[cfg(feature = "wlr")]
 pub fn autostart() -> PathBuf {
     std::env::var_os("LXWC_AUTOSTART")
         .map(PathBuf::from)

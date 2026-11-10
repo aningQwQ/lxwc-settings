@@ -1,9 +1,14 @@
+use std::sync::Arc;
+
 use crate::config::{CommandSpec, ConfigFile};
+use crate::core::outputs::Outputs;
 
 /// Group id used by pages that do not belong to a single compositor.
+#[cfg(feature = "wlr-ui")]
 pub const GROUP_OUTPUT: &str = "output";
 
 /// A sidebar section. Pages pick their section through `ModuleMeta::group`.
+#[derive(Clone, Copy, Debug)]
 pub struct Group {
     pub id: &'static str,
     pub label_key: &'static str,
@@ -14,8 +19,23 @@ pub struct Group {
 /// Pages are constructed separately by `backends::modules` so the application
 /// can hold mutable page state while reading immutable backend metadata.
 pub struct Backend {
-    pub id: &'static str,
     pub groups: Vec<Group>,
     pub files: Vec<ConfigFile>,
     pub reload: Option<CommandSpec>,
+}
+
+/// Capabilities resolved by the plugin registry and handed to page builders.
+#[derive(Clone, Default)]
+pub struct Deps {
+    pub outputs: Option<Arc<dyn Outputs>>,
+}
+
+impl Backend {
+    pub fn empty() -> Self {
+        Self {
+            groups: Vec::new(),
+            files: Vec::new(),
+            reload: None,
+        }
+    }
 }

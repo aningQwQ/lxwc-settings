@@ -1,17 +1,42 @@
+mod worker;
+
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use eframe::egui::{self, RichText};
 
-use crate::backend::GROUP_OUTPUT;
+use crate::backend::{Deps, Group, GROUP_OUTPUT};
 use crate::core::model::{ApplyReport, Task};
+use crate::core::outputs::{Mode, OutputInfo, Outputs};
 use crate::i18n::t;
 use crate::modules::{
     ModuleCtx, ModuleMeta, ModulePayload, ModuleRequest, SettingsModule, DISPLAY_PERSIST_MODULE_ID,
 };
+use crate::plugin::{capability, Plugin};
 use crate::ui::theme;
-use crate::wlr::worker::{self, Event as DisplayEvent, Request as DisplayRequest};
-use crate::wlr::{Mode, OutputInfo};
+
+use worker::{Event as DisplayEvent, Request as DisplayRequest};
+
+pub const PLUGIN: Plugin = Plugin {
+    id: "wlr-ui",
+    provides: &[],
+    requires: &[capability::OUTPUTS],
+    groups: &[Group {
+        id: GROUP_OUTPUT,
+        label_key: "wlr_module",
+    }],
+    backend: None,
+    pages: Some(pages),
+    outputs: None,
+};
+
+fn pages(ctx: &egui::Context, deps: &Deps) -> Vec<Box<dyn SettingsModule>> {
+    match deps.outputs.clone() {
+        Some(outputs) => vec![Box::new(DisplayModule::new(ctx, outputs))],
+        None => Vec::new(),
+    }
+}
 
 const WATCHDOG_SECONDS: u64 = 15;
 
@@ -56,12 +81,12 @@ pub struct DisplayModule {
 }
 
 impl DisplayModule {
-    pub fn new(ui_ctx: &egui::Context) -> Self {
+    pub fn new(ui_ctx: &egui::Context, outputs: Arc<dyn Outputs>) -> Self {
         let repaint = {
             let ctx = ui_ctx.clone();
             move || ctx.request_repaint()
         };
-        let (tx, rx) = worker::spawn(repaint);
+        let (tx, rx) = worker::spawn(outputs, repaint);
         Self {
             tx,
             rx,
@@ -170,7 +195,7 @@ impl DisplayModule {
         ctx.info(crate::trf!("switching_to", mode.label()));
         let _ = self.tx.send(DisplayRequest::ApplyMode {
             output: output.name,
-            spec: mode.spec(),
+            mode,
         });
     }
 
@@ -178,7 +203,7 @@ impl DisplayModule {
         if let Some(watchdog) = self.watchdog.take() {
             let _ = self.tx.send(DisplayRequest::RevertMode {
                 output: watchdog.output.clone(),
-                spec: watchdog.previous.spec(),
+                mode: watchdog.previous,
             });
             ctx.info(crate::trf!("restoring", watchdog.output));
         }
@@ -531,11 +556,11 @@ impl SettingsModule for DisplayModule {
             ctx.info(t("new_display_mode_kept"));
         } else if set_default {
             let output = watchdog.output.clone();
-            let spec = watchdog.mode.spec();
+            let mode = watchdog.mode;
             self.watchdog = None;
             ctx.requests.push(ModuleRequest {
                 target: DISPLAY_PERSIST_MODULE_ID,
-                payload: ModulePayload::DisplayDefault { output, spec },
+                payload: ModulePayload::DisplayDefault { output, mode },
             });
             ctx.info(t("display_default_handed_off"));
         }

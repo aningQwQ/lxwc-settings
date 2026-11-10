@@ -1,15 +1,16 @@
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 use std::time::Duration;
 
 use eframe::egui::{self, RichText};
 
-use crate::backends::labwc::{autostart, paths, GROUP};
 use crate::core::model::{ApplyReport, Effect, Task};
+use crate::core::outputs::{Mode, OutputInfo, Outputs};
 use crate::i18n::t;
 use crate::modules::{ModuleCtx, ModuleMeta, ModulePayload, SettingsModule};
+use crate::plugins::labwc::{autostart, paths, GROUP};
 use crate::ui::theme;
-use crate::wlr::{self, Mode, OutputInfo};
 
 pub const MODULE_ID: &str = crate::modules::DISPLAY_PERSIST_MODULE_ID;
 const TASK_ID: &str = "display-default";
@@ -21,6 +22,7 @@ enum DisplayPersist {
 }
 
 pub struct DisplayPersistModule {
+    provider: Arc<dyn Outputs>,
     autostart_path: PathBuf,
     autostart_raw: String,
     autostart_exists: bool,
@@ -34,12 +36,13 @@ pub struct DisplayPersistModule {
 }
 
 impl DisplayPersistModule {
-    pub fn new() -> Self {
-        Self::with_path(paths::autostart())
+    pub fn new(provider: Arc<dyn Outputs>) -> Self {
+        Self::with_path(paths::autostart(), provider)
     }
 
-    fn with_path(autostart_path: PathBuf) -> Self {
+    fn with_path(autostart_path: PathBuf, provider: Arc<dyn Outputs>) -> Self {
         let mut module = Self {
+            provider,
             autostart_path,
             autostart_raw: String::new(),
             autostart_exists: false,
@@ -85,10 +88,8 @@ impl DisplayPersistModule {
     }
 
     fn saved_default(&self) -> Option<(String, Mode)> {
-        let (output, spec) = autostart::managed_block(&self.autostart_raw)
-            .and_then(|block| autostart::parse_command(&block))?;
-        let mode = wlr::parse_spec(&spec)?;
-        Some((output, mode))
+        autostart::managed_block(&self.autostart_raw)
+            .and_then(|block| autostart::parse_saved(&block))
     }
 
     fn selection_from_config(&mut self) {
@@ -106,7 +107,14 @@ impl DisplayPersistModule {
             return;
         }
         self.scan_error = None;
-        self.scan_rx = Some(wlr::scan_async());
+        let provider = self.provider.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let _ = std::thread::Builder::new()
+            .name("lxwc-output-scan".to_string())
+            .spawn(move || {
+                let _ = tx.send(provider.scan());
+            });
+        self.scan_rx = Some(rx);
     }
 
     fn poll_scan(&mut self) {
@@ -186,7 +194,7 @@ impl DisplayPersistModule {
         }
         let output_name = self.selected_output.as_ref()?;
         let mode = self.selected_mode.as_ref()?;
-        let command = wlr::set_mode_command(output_name, &mode.spec());
+        let command = autostart::mode_command(output_name, mode);
         let contents = autostart::contents(&self.autostart_raw, &command);
         if contents == self.autostart_raw {
             return None;
@@ -267,9 +275,9 @@ impl SettingsModule for DisplayPersistModule {
 
     fn on_message(&mut self, payload: &ModulePayload) {
         match payload {
-            ModulePayload::DisplayDefault { output, spec } => {
+            ModulePayload::DisplayDefault { output, mode } => {
                 self.selected_output = Some(output.clone());
-                self.selected_mode = wlr::parse_spec(spec);
+                self.selected_mode = Some(mode.clone());
                 self.display_persist = DisplayPersist::Static;
 
                 if let Some(mode) = &self.selected_mode {
@@ -414,7 +422,7 @@ impl SettingsModule for DisplayPersistModule {
                     if let Some((output_name, mode)) = &selection {
                         ui.label(crate::trf!("will_persist", output_name, mode.label()));
                         ui.label(RichText::new(t("will_write")).small().strong());
-                        let command = wlr::set_mode_command(output_name, &mode.spec());
+                        let command = autostart::mode_command(output_name, mode);
                         ui.label(
                             RichText::new(crate::trf!("autostart_command", command))
                                 .monospace()
@@ -476,6 +484,22 @@ mod tests {
         (dir, autostart)
     }
 
+    struct NoOutputs;
+
+    impl Outputs for NoOutputs {
+        fn scan(&self) -> Result<Vec<OutputInfo>, String> {
+            Err("unavailable".to_string())
+        }
+
+        fn apply(&self, _output: &str, _mode: &Mode) -> Result<(), String> {
+            Err("unavailable".to_string())
+        }
+    }
+
+    fn test_outputs() -> Arc<dyn Outputs> {
+        Arc::new(NoOutputs)
+    }
+
     fn report(ok: bool) -> ApplyReport {
         ApplyReport {
             results: vec![TaskResult {
@@ -503,16 +527,16 @@ mod tests {
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let mut module = DisplayPersistModule::with_path(autostart_path);
+        let mut module = DisplayPersistModule::with_path(autostart_path, test_outputs());
         module.display_persist = DisplayPersist::None;
         module.selected_output = Some("B".to_string());
-        module.selected_mode = wlr::parse_spec("2x2@50.000000Hz");
+        module.selected_mode = autostart::parse_mode("2x2@50.000000Hz");
 
         module.restore_from_config();
         assert_eq!(module.display_persist, DisplayPersist::Static);
         assert_eq!(module.selected_output.as_deref(), Some("A"));
         assert_eq!(
-            module.selected_mode.as_ref().map(|mode| mode.spec()),
+            module.selected_mode.as_ref().map(autostart::mode_spec),
             Some("1x1@60.000000Hz".to_string())
         );
 
@@ -522,7 +546,7 @@ mod tests {
     #[test]
     fn detects_existing_persist_mode() {
         let (dir, autostart_path) = temp_paths();
-        let mut module = DisplayPersistModule::with_path(autostart_path.clone());
+        let mut module = DisplayPersistModule::with_path(autostart_path.clone(), test_outputs());
         assert_eq!(module.display_persist, DisplayPersist::None);
 
         std::fs::write(
@@ -530,11 +554,11 @@ mod tests {
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        module = DisplayPersistModule::with_path(autostart_path);
+        module = DisplayPersistModule::with_path(autostart_path, test_outputs());
         assert_eq!(module.display_persist, DisplayPersist::Static);
         assert_eq!(module.selected_output.as_deref(), Some("A"));
         assert_eq!(
-            module.selected_mode.as_ref().map(|mode| mode.spec()),
+            module.selected_mode.as_ref().map(autostart::mode_spec),
             Some("1x1@60.000000Hz".to_string())
         );
 
@@ -549,19 +573,19 @@ mod tests {
             autostart::contents("", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let module = DisplayPersistModule::with_path(autostart_path);
+        let module = DisplayPersistModule::with_path(autostart_path, test_outputs());
         let (output, mode) = module.saved_default().unwrap();
         assert_eq!(output, "A");
-        assert_eq!(mode.spec(), "1x1@60.000000Hz");
+        assert_eq!(autostart::mode_spec(&mode), "1x1@60.000000Hz");
         std::fs::remove_dir_all(dir).ok();
     }
 
     #[test]
     fn display_default_writes_autostart() {
         let (dir, autostart) = temp_paths();
-        let mut module = DisplayPersistModule::with_path(autostart);
+        let mut module = DisplayPersistModule::with_path(autostart, test_outputs());
         module.selected_output = Some("HDMI-A-1".to_string());
-        module.selected_mode = Some(wlr::parse_spec("1920x1080@60.000000Hz").unwrap());
+        module.selected_mode = Some(autostart::parse_mode("1920x1080@60.000000Hz").unwrap());
         module.display_persist = DisplayPersist::Static;
 
         let tasks = module.pending();
@@ -593,7 +617,7 @@ mod tests {
             autostart::contents("foo\n", "wlr-randr --output A --mode 1x1@60.000000Hz"),
         )
         .unwrap();
-        let mut module = DisplayPersistModule::with_path(autostart_path.clone());
+        let mut module = DisplayPersistModule::with_path(autostart_path.clone(), test_outputs());
         module.display_persist = DisplayPersist::None;
 
         let tasks = module.pending();
@@ -614,14 +638,14 @@ mod tests {
     #[test]
     fn handoff_prefills_selection() {
         let (dir, autostart) = temp_paths();
-        let mut module = DisplayPersistModule::with_path(autostart);
+        let mut module = DisplayPersistModule::with_path(autostart, test_outputs());
         module.on_message(&ModulePayload::DisplayDefault {
             output: "HDMI-A-1".to_string(),
-            spec: "1920x1080@60.000000Hz".to_string(),
+            mode: autostart::parse_mode("1920x1080@60.000000Hz").unwrap(),
         });
         assert_eq!(module.selected_output.as_deref(), Some("HDMI-A-1"));
         assert_eq!(
-            module.selected_mode.as_ref().map(|mode| mode.spec()),
+            module.selected_mode.as_ref().map(autostart::mode_spec),
             Some("1920x1080@60.000000Hz".to_string())
         );
         std::fs::remove_dir_all(dir).ok();

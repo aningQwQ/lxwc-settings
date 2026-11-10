@@ -428,3 +428,4 @@ clear_persisted_display_help	移除由程序管理的显示配置块。
 will_clear_persisted_display	应用后将清除由程序管理的显示配置。
 do_not_persist	不设置默认显示
 not_persisting_help	不会写入 autostart 显示配置。
+no_compositor_backend_enabled	没有启用任何合成器后端或插件。

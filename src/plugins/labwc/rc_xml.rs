@@ -2,8 +2,8 @@ use quick_xml::escape::unescape;
 use quick_xml::events::{BytesStart, BytesText, Event};
 use quick_xml::Reader;
 
-use crate::backends::labwc::actions::known_action_label;
 use crate::i18n::t;
+use crate::plugins::labwc::actions::known_action_label;
 
 pub fn load(path: &std::path::Path) -> Result<crate::services::fs::LoadedFile, String> {
     crate::services::fs::load(path)

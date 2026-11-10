@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::backends::labwc::{environment, paths, rc_xml, ENVIRONMENT_FILE, RC_XML_FILE};
 use crate::modules::ConfigEdit;
+use crate::plugins::labwc::{environment, paths, rc_xml, ENVIRONMENT_FILE, RC_XML_FILE};
 
 #[derive(Clone, Copy)]
 pub struct Spec {

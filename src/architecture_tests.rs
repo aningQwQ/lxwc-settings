@@ -1,9 +1,8 @@
 //! Dependency-direction guards.
 //!
 //! Rust gives no visibility boundary inside a binary crate, so these tests keep
-//! the layering honest: generic pages must not learn about a backend, backend
-//! adapters must not learn about pages or UI, and backends must not import each
-//! other.
+//! the layering honest: pages must not learn about plugins, plugins must not
+//! import each other, and backends must not import pages or UI.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -44,45 +43,42 @@ fn assert_absent(root: &str, needles: &[&str]) {
 }
 
 #[test]
-fn generic_pages_do_not_depend_on_a_backend() {
-    assert_absent("src/pages", &["crate::backends", "/labwc_config"]);
+fn generic_pages_do_not_depend_on_plugins() {
+    assert_absent("src/pages", &["crate::plugins", "/labwc_config"]);
 }
 
 #[test]
-fn config_layer_does_not_depend_on_pages_or_backends() {
-    assert_absent("src/config", &["crate::backends", "crate::modules"]);
+fn config_layer_does_not_depend_on_pages_or_plugins() {
+    assert_absent("src/config", &["crate::plugins", "crate::modules"]);
 }
 
 #[test]
-fn core_does_not_depend_on_pages_or_backends() {
+fn core_does_not_depend_on_pages_plugins_or_modules() {
     assert_absent(
         "src/core",
-        &["crate::backends", "crate::modules", "crate::pages"],
+        &["crate::plugins", "crate::modules", "crate::pages"],
     );
 }
 
 #[test]
-fn backends_do_not_import_each_other() {
-    let backends = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/backends");
-    let entries = fs::read_dir(&backends).expect("src/backends");
-    for entry in entries.flatten() {
+fn plugins_do_not_import_each_other() {
+    let plugins = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/plugins");
+    for entry in fs::read_dir(&plugins).expect("src/plugins").flatten() {
         if !entry.path().is_dir() {
             continue;
         }
         let id = entry.file_name().to_string_lossy().to_string();
-        let prefix = format!("src/backends/{id}");
-        for path in sources(&prefix) {
+        for path in sources(&format!("src/plugins/{id}")) {
             let text = fs::read_to_string(&path).expect("read source");
-            for other in fs::read_dir(&backends).expect("src/backends") {
-                let other = other.expect("backend entry");
+            for other in fs::read_dir(&plugins).expect("src/plugins").flatten() {
                 let other_id = other.file_name().to_string_lossy().to_string();
                 if other_id == id || !other.path().is_dir() {
                     continue;
                 }
-                let needle = format!("crate::backends::{other_id}");
+                let needle = format!("crate::plugins::{other_id}");
                 assert!(
                     !text.contains(&needle),
-                    "{} must not import backend `{}`",
+                    "{} must not import plugin `{}`",
                     path.display(),
                     other_id
                 );
@@ -93,9 +89,8 @@ fn backends_do_not_import_each_other() {
 
 #[test]
 fn backend_adapters_do_not_depend_on_pages_or_ui() {
-    let labwc = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/backends/labwc");
-    let entries = fs::read_dir(&labwc).expect("src/backends/labwc");
-    for entry in entries.flatten() {
+    let labwc = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/plugins/labwc");
+    for entry in fs::read_dir(&labwc).expect("src/plugins/labwc").flatten() {
         let path = entry.path();
         if !path.is_file()
             || path.file_name().is_none_or(|name| name == "mod.rs")
@@ -115,4 +110,12 @@ fn backend_adapters_do_not_depend_on_pages_or_ui() {
             path.display()
         );
     }
+}
+
+#[test]
+fn output_provider_stays_headless() {
+    assert_absent(
+        "src/plugins/wlr",
+        &["crate::ui", "crate::modules", "crate::pages"],
+    );
 }

@@ -1,55 +1,35 @@
-pub mod worker;
+use std::sync::Arc;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Mode {
-    pub width: u32,
-    pub height: u32,
-    pub refresh: f64,
-}
+use crate::core::outputs::{Mode, OutputInfo, Outputs};
+use crate::plugin::{capability, Plugin};
 
-impl Mode {
-    pub fn spec(&self) -> String {
-        format!("{}x{}@{:.6}Hz", self.width, self.height, self.refresh)
+pub const PLUGIN: Plugin = Plugin {
+    id: "wlr",
+    provides: &[capability::OUTPUTS],
+    requires: &[],
+    groups: &[],
+    backend: None,
+    pages: None,
+    outputs: Some(|| Arc::new(WlrOutputs)),
+};
+
+pub struct WlrOutputs;
+
+impl Outputs for WlrOutputs {
+    fn scan(&self) -> Result<Vec<OutputInfo>, String> {
+        scan()
     }
 
-    pub fn label(&self) -> String {
-        format!("{} × {} @ {:.2} Hz", self.width, self.height, self.refresh)
-    }
-
-    pub fn same_mode(&self, other: &Mode) -> bool {
-        self.width == other.width
-            && self.height == other.height
-            && (self.refresh - other.refresh).abs() < 0.001
+    fn apply(&self, output: &str, mode: &Mode) -> Result<(), String> {
+        set_mode(output, &format_spec(mode))
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct OutputInfo {
-    pub name: String,
-    pub description: String,
-    pub enabled: bool,
-    pub current: Option<Mode>,
-    pub modes: Vec<Mode>,
-    pub position: Option<(i32, i32)>,
-    pub scale: Option<f32>,
+fn format_spec(mode: &Mode) -> String {
+    format!("{}x{}@{:.6}Hz", mode.width, mode.height, mode.refresh)
 }
 
-pub fn parse_spec(spec: &str) -> Option<Mode> {
-    let (dims, refresh) = spec.split_once('@')?;
-    let (width, height) = dims.split_once('x')?;
-    let refresh = refresh.strip_suffix("Hz")?;
-    Some(Mode {
-        width: width.parse().ok()?,
-        height: height.parse().ok()?,
-        refresh: refresh.parse().ok()?,
-    })
-}
-
-pub fn set_mode_command(output: &str, spec: &str) -> String {
-    format!("wlr-randr --output {output} --mode {spec}")
-}
-
-pub fn set_mode(output: &str, spec: &str) -> Result<(), String> {
+fn set_mode(output: &str, spec: &str) -> Result<(), String> {
     let args = vec![
         "--output".to_string(),
         output.to_string(),
@@ -71,17 +51,7 @@ pub fn set_mode(output: &str, spec: &str) -> Result<(), String> {
     Err(crate::trf!("wlr_randr_failed_to_switch_modes", detail))
 }
 
-pub fn scan_async() -> std::sync::mpsc::Receiver<Result<Vec<OutputInfo>, String>> {
-    let (tx, rx) = std::sync::mpsc::channel();
-    let _ = std::thread::Builder::new()
-        .name("lxwc-wlr-scan".to_string())
-        .spawn(move || {
-            let _ = tx.send(scan());
-        });
-    rx
-}
-
-pub fn scan() -> Result<Vec<OutputInfo>, String> {
+fn scan() -> Result<Vec<OutputInfo>, String> {
     let output = crate::services::process::run("wlr-randr", &[])
         .map_err(|err| crate::trf!("failed_to_run_wlr_randr", err))?;
     if !output.success {
@@ -239,28 +209,12 @@ mod tests {
     }
 
     #[test]
-    fn mode_spec_matches_wlr_randr() {
+    fn formats_mode_spec_for_wlr_randr() {
         let mode = Mode {
             width: 1920,
             height: 1080,
             refresh: 59.939999,
         };
-        assert_eq!(mode.spec(), "1920x1080@59.939999Hz");
-    }
-
-    #[test]
-    fn builds_set_mode_command() {
-        assert_eq!(
-            set_mode_command("HDMI-A-1", "1920x1080@60.000000Hz"),
-            "wlr-randr --output HDMI-A-1 --mode 1920x1080@60.000000Hz"
-        );
-    }
-
-    #[test]
-    fn parses_mode_spec() {
-        let mode = parse_spec("1920x1080@60.000000Hz").unwrap();
-        assert_eq!(mode.width, 1920);
-        assert_eq!(mode.height, 1080);
-        assert!((mode.refresh - 60.0).abs() < 0.001);
+        assert_eq!(format_spec(&mode), "1920x1080@59.939999Hz");
     }
 }

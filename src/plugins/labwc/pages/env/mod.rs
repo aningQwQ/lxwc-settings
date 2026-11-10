@@ -3,10 +3,10 @@ use std::path::PathBuf;
 
 use eframe::egui::{self, RichText};
 
-use crate::backends::labwc::{environment, paths, ENVIRONMENT_FILE, GROUP};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
 use crate::modules::{ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule};
+use crate::plugins::labwc::{environment, paths, ENVIRONMENT_FILE, GROUP};
 use crate::ui::theme;
 
 struct ManagedEnv {

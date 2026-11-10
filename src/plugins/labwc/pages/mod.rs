@@ -1,5 +1,6 @@
 pub mod appearance;
 pub mod behaviour;
+#[cfg(feature = "wlr")]
 pub mod display_persist;
 pub mod env;
 pub mod keybind;

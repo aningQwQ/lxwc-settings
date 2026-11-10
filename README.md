@@ -113,33 +113,51 @@ Temporary files use the `.lxwc.tmp` suffix.
 
 ```text
 src/
-  app.rs          Backend-driven task aggregation, confirmation and apply state
-  backend.rs      Backend/Group description the shell consumes
-  backends/       One directory per compositor: adapters, config formats, pages
-    labwc/        rc.xml, environment, autostart, XKB, keybinds, Labwc pages
-    mod.rs        Detection, factories, page registration
+  app.rs          Shell: task aggregation, confirmation, apply state
+  backend.rs      Backend/Group/Deps description the shell consumes
+  plugin.rs       Plugin manifest: provides, requires, backend, pages, groups
+  plugins/        Every optional unit, plus the registry
+    mod.rs        Detection, requirement resolution, composition
+    labwc/        Backend plugin: adapters, config formats, pages
+    wlr/          Output provider plugin (headless)
+    wlr_ui/       Output-control page plugin (requires `wlr`)
   config/         ConfigFile / ConfigFormat / ConfigEdit / PatchOutcome
   modules/        SettingsModule contract shared by every page
-  pages/          Pages that are not tied to one compositor
-  wlr/            WLR adapter: wlr-randr scanning, parsing, mode commands
-  plugins/        UI-free presets such as LXQt commands
+  pages/          Reserved for compositor-neutral pages (currently empty)
   services/       Generic file transactions and the background worker
-  core/           Domain model: Effect, Task, TaskResult, ApplyReport
+  core/           Domain model and capability traits (Outputs)
   ui/             Sidebar, status bar, and theme
   i18n.rs         Runtime translation loader
 ```
 
 Dependency direction:
 
-- `core` and `config` know nothing about pages, UI or a compositor.
-- `backends/<id>` owns paths, file formats, reload commands and its pages.
-- `pages/` holds compositor-neutral pages; it must not import `backends/`.
+- `core` and `config` know nothing about plugins, pages or UI.
+- Plugins never import each other; they meet at kernel contracts such as
+  `core::outputs::Outputs`. Only `plugins/mod.rs` references all plugins.
+- A provider plugin is headless; page plugins may use `modules/` and `ui/`.
+- `pages/` must not import `crate::plugins` or name a backend key space.
+- The registry enables a plugin only when its `requires` are provided; a missing
+  provider disables the plugin instead of running half of it.
 - `modules/` is only the page contract: pages name a backend file id, never a path.
-- `app` reads the backend file list, aggregates one task per file, and routes page requests.
+- `app` reads the resolved backend file list, aggregates one task per file, and
+  routes page requests. It never names a plugin.
 - Persistence always goes through `Effect::WriteFile` / `Effect::RunCommand`.
 - `src/architecture_tests.rs` enforces these edges at test time.
 
-`LXWC_BACKEND` forces a backend. With one backend it defaults to `labwc`.
+`LXWC_BACKEND` forces a backend plugin by id.
+
+## Optional components
+
+| Feature | Contents | Default |
+| --- | --- | --- |
+| `labwc` | Labwc backend plugin; pulls `wlr` and `wlr-ui` | on |
+| `wlr` | `wlr-randr` provider: output scan and live mode switching | on (via `labwc`) |
+| `wlr-ui` | Output-control page plugin | on (via `labwc`) |
+
+`cargo build --no-default-features` builds the shell with no plugins and shows
+"No compositor backend or plugins are enabled". Dropping `wlr` requires dropping
+`wlr-ui` and `labwc`; Cargo enforces the dependency edges.
 
 ## Testing
 

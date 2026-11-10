@@ -1,5 +1,5 @@
-use crate::backends::labwc::rc_xml::KeybindAction;
 use crate::i18n::t;
+use crate::plugins::labwc::rc_xml::KeybindAction;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeybindEdit {

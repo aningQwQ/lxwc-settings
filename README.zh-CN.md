@@ -105,33 +105,48 @@ cargo install --path .
 
 ```text
 src/
-  app.rs          后端驱动的任务聚合、确认与应用状态
-  backend.rs      外壳消费的后端/分组描述
-  backends/       每个合成器一个目录：适配器、配置格式、页面
-    labwc/        rc.xml、environment、autostart、XKB、快捷键与 Labwc 页面
-    mod.rs        探测、工厂、页面注册
+  app.rs          外壳：任务聚合、确认与应用状态
+  backend.rs      外壳消费的后端/分组/能力描述
+  plugin.rs       插件清单：provides、requires、backend、pages、groups
+  plugins/        所有可选单元与注册表
+    mod.rs        探测、需求解析、组装
+    labwc/        后端插件：适配器、配置格式、页面
+    wlr/          输出提供者插件（无 UI）
+    wlr_ui/       输出控制页面插件（requires `wlr`）
   config/         ConfigFile / ConfigFormat / ConfigEdit / PatchOutcome
   modules/        所有页面共用的 SettingsModule 契约
-  pages/          与具体合成器无关的页面
-  wlr/            WLR 适配器：wlr-randr 扫描、解析、模式命令
-  plugins/        无 UI 的预设，例如 LXQt 命令
+  pages/          预留的合成器无关页面（目前为空）
   services/       通用文件事务和后台 worker
-  core/           领域模型：Effect、Task、TaskResult、ApplyReport
+  core/           领域模型与能力接口（Outputs）
   ui/             侧边栏、状态栏和主题
   i18n.rs         运行时翻译加载
 ```
 
 依赖方向：
 
-- `core` 与 `config` 不认识页面、UI 或具体合成器。
-- `backends/<id>` 拥有路径、文件格式、重载命令和它自己的页面。
-- `pages/` 存放合成器无关页面，不得 import `backends/`。
+- `core` 与 `config` 不认识插件、页面或 UI。
+- 插件之间不得互相 import，只能通过内核接口（如 `core::outputs::Outputs`）协作；
+  只有 `plugins/mod.rs` 引用所有插件。
+- 提供者插件无 UI；页面插件可以使用 `modules/` 与 `ui/`。
+- `pages/` 不得 import `crate::plugins`，也不得出现后端键空间。
+- 注册表只在 `requires` 被满足时启用插件；缺提供者时禁用该插件，而不是半套运行。
 - `modules/` 只是页面契约：页面只声明后端文件 id，不出现路径。
-- `app` 读取后端文件清单，按文件聚合任务，并分发页面请求。
+- `app` 读取解析后的后端文件清单，按文件聚合任务并分发页面请求，从不指名插件。
 - 持久化统一使用 `Effect::WriteFile` / `Effect::RunCommand`。
 - `src/architecture_tests.rs` 在测试期强制这些依赖方向。
 
-`LXWC_BACKEND` 可强制指定后端；目前只有一个后端时默认 `labwc`。
+`LXWC_BACKEND` 可按 id 强制指定后端插件。
+
+## 可选组件
+
+| Feature | 内容 | 默认 |
+| --- | --- | --- |
+| `labwc` | Labwc 后端插件，自动带上 `wlr` 与 `wlr-ui` | 开 |
+| `wlr` | `wlr-randr` 提供者：输出扫描与实时模式切换 | 开（由 `labwc` 带入） |
+| `wlr-ui` | 输出控制页面插件 | 开（由 `labwc` 带入） |
+
+`cargo build --no-default-features` 构建零插件外壳，界面显示“没有启用任何合成器后端或插件”。
+卸载 `wlr` 必须同时卸载 `wlr-ui` 与 `labwc`，依赖边由 Cargo 保证。
 
 ## 测试
 

@@ -1,11 +1,11 @@
 use eframe::egui::{self, RichText};
 
-use crate::backends::labwc::layouts::{self, Layout, LayoutEntry};
-use crate::backends::labwc::pages::scalar::{EnvState, ScalarState, Spec};
-use crate::backends::labwc::{ENVIRONMENT_FILE, GROUP, RC_XML_FILE};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
 use crate::modules::{ConfigEdit, ModuleCtx, ModuleMeta, SettingsModule};
+use crate::plugins::labwc::layouts::{self, Layout, LayoutEntry};
+use crate::plugins::labwc::pages::scalar::{EnvState, ScalarState, Spec};
+use crate::plugins::labwc::{ENVIRONMENT_FILE, GROUP, RC_XML_FILE};
 use crate::ui::theme;
 
 const MODULE_ID: &str = "keyboard";

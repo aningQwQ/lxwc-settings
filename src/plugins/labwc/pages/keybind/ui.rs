@@ -2,12 +2,12 @@ use eframe::egui::{self, RichText};
 
 use super::types::*;
 use super::KeybindModule;
-use crate::backends::labwc::actions::{known_action_label, ACTION_SUGGESTIONS};
-use crate::backends::labwc::keycombo::{parse_parts, toggle_base_key, toggle_modifier};
-use crate::backends::labwc::rc_xml;
-use crate::backends::labwc::rc_xml::{KeybindAction, KeybindEntry};
 use crate::i18n::t;
 use crate::modules::ModuleCtx;
+use crate::plugins::labwc::actions::{known_action_label, ACTION_SUGGESTIONS};
+use crate::plugins::labwc::keycombo::{parse_parts, toggle_base_key, toggle_modifier};
+use crate::plugins::labwc::rc_xml;
+use crate::plugins::labwc::rc_xml::{KeybindAction, KeybindEntry};
 use crate::ui::theme;
 
 pub(super) fn show(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx) {
@@ -130,7 +130,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
                 egui::ComboBox::from_id_source("lxqt-presets")
                     .selected_text(t("choose_preset"))
                     .show_ui(ui, |ui| {
-                        for preset in crate::plugins::lxqt::PRESETS {
+                        for preset in crate::plugins::labwc::lxqt::PRESETS {
                             let response =
                                 ui.selectable_label(false, t(preset.label_key));
                             if response.on_hover_text(preset.command).clicked() {
@@ -268,7 +268,7 @@ fn edit_view(module: &mut KeybindModule, ui: &mut egui::Ui, ctx: &mut ModuleCtx)
             module.discard_edit(&edit);
         }
 
-        if let Some(err) = ctx.failures.get(crate::backends::labwc::RC_XML_FILE) {
+        if let Some(err) = ctx.failures.get(crate::plugins::labwc::RC_XML_FILE) {
             ui.colored_label(theme::DANGER, RichText::new(err).small());
         }
 

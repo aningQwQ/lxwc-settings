@@ -5,11 +5,11 @@ use std::path::PathBuf;
 
 use eframe::egui;
 
-use crate::backends::labwc::rc_xml::{KeybindAction, KeybindEntry};
-use crate::backends::labwc::{paths, rc_xml, GROUP, RC_XML_FILE};
 use crate::core::model::ApplyReport;
 use crate::i18n::t;
 use crate::modules::{ModuleCtx, ModuleMeta, PatchOutcome, SettingsModule};
+use crate::plugins::labwc::rc_xml::{KeybindAction, KeybindEntry};
+use crate::plugins::labwc::{paths, rc_xml, GROUP, RC_XML_FILE};
 
 use types::*;
 

@@ -1,3 +1,5 @@
+use crate::core::outputs::Mode;
+
 const AUTOSTART_BEGIN: &str = "# BEGIN lxwc-settings default display";
 const AUTOSTART_END: &str = "# END lxwc-settings default display";
 
@@ -59,6 +61,31 @@ pub fn parse_command(block: &str) -> Option<(String, String)> {
         }
     }
     None
+}
+
+/// Textual mode form used by `wlr-randr` and persisted in autostart.
+pub fn mode_spec(mode: &Mode) -> String {
+    format!("{}x{}@{:.6}Hz", mode.width, mode.height, mode.refresh)
+}
+
+pub fn parse_mode(spec: &str) -> Option<Mode> {
+    let (dims, refresh) = spec.split_once('@')?;
+    let (width, height) = dims.split_once('x')?;
+    let refresh = refresh.strip_suffix("Hz")?;
+    Some(Mode {
+        width: width.parse().ok()?,
+        height: height.parse().ok()?,
+        refresh: refresh.parse().ok()?,
+    })
+}
+
+pub fn mode_command(output: &str, mode: &Mode) -> String {
+    format!("wlr-randr --output {output} --mode {}", mode_spec(mode))
+}
+
+pub fn parse_saved(block: &str) -> Option<(String, Mode)> {
+    let (output, spec) = parse_command(block)?;
+    Some((output, parse_mode(&spec)?))
 }
 
 pub fn remove_block(raw: &str) -> String {
@@ -150,5 +177,28 @@ mod tests {
         let with_other = contents("foo\n", "cmd");
         assert!(with_other.contains("foo"));
         assert!(with_other.contains("cmd"));
+    }
+    #[test]
+    fn mode_spec_matches_wlr_randr() {
+        let mode = Mode {
+            width: 1920,
+            height: 1080,
+            refresh: 59.939999,
+        };
+        assert_eq!(mode_spec(&mode), "1920x1080@59.939999Hz");
+        assert!(mode.same_mode(&parse_mode("1920x1080@59.939999Hz").unwrap()));
+    }
+
+    #[test]
+    fn builds_startup_mode_command() {
+        let mode = Mode {
+            width: 1920,
+            height: 1080,
+            refresh: 60.0,
+        };
+        assert_eq!(
+            mode_command("HDMI-A-1", &mode),
+            "wlr-randr --output HDMI-A-1 --mode 1920x1080@60.000000Hz"
+        );
     }
 }

@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use eframe::egui;
 
 use crate::core::model::{ApplyReport, Task};
+use crate::core::outputs::Mode;
 
 pub use crate::config::{ConfigEdit, PatchOutcome};
 
@@ -37,7 +38,7 @@ pub struct ModuleRequest {
 }
 
 pub enum ModulePayload {
-    DisplayDefault { output: String, spec: String },
+    DisplayDefault { output: String, mode: Mode },
 }
 
 pub struct ModuleCtx<'a> {

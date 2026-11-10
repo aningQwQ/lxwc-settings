@@ -428,3 +428,4 @@ clear_persisted_display_help	Remove the managed display block.
 will_clear_persisted_display	Applying will clear the managed display configuration.
 do_not_persist	Do not persist a display
 not_persisting_help	No autostart display block will be written.
+no_compositor_backend_enabled	No compositor backend or plugins are enabled.

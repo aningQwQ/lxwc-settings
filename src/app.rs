@@ -2,11 +2,11 @@ use eframe::egui;
 use std::collections::HashMap;
 
 use crate::backend::Backend;
-use crate::backends;
 use crate::config::ConfigEdit;
 use crate::core::model::{ApplyReport, Effect, Task};
 use crate::i18n::{self, t, Lang};
 use crate::modules::{ModuleCtx, SettingsModule, StatusMessage};
+use crate::plugins;
 use crate::services::fs;
 use crate::services::worker::{WorkerEvent, WorkerHandle, WorkerRequest};
 use crate::ui::{sidebar, status_bar, theme};
@@ -31,8 +31,9 @@ impl App {
         let lang = i18n::initial();
         i18n::set_current(lang);
 
-        let backend = backends::create(backends::detect());
-        let mut modules = backends::modules(backend.id, ctx);
+        let composition = plugins::compose(plugins::detect(), ctx);
+        let backend = composition.backend;
+        let mut modules = composition.modules;
         for module in &mut modules {
             module.refresh();
         }
@@ -423,6 +424,12 @@ impl eframe::App for App {
             egui::ScrollArea::vertical()
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    if self.modules.is_empty() {
+                        ui.add_space(12.0);
+                        ui.label(t("no_compositor_backend_enabled"));
+                        return;
+                    }
+
                     let meta = self.modules.get(current).map(|module| module.meta());
                     if let Some(meta) = meta {
                         ui.add_space(6.0);
@@ -477,15 +484,17 @@ impl eframe::App for App {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "labwc"))]
 mod tests {
     use super::*;
-    use crate::backend::{Group, GROUP_OUTPUT};
-    use crate::backends::labwc;
+    use crate::backend::Group;
     use crate::config::{CommandSpec, ConfigFile};
     use crate::modules::ModuleMeta;
+    use crate::plugins::labwc;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    const TEST_GROUP: &str = "test";
 
     struct FakeModule {
         id: &'static str,
@@ -498,7 +507,7 @@ mod tests {
                 id: self.id,
                 title_key: "appearance",
                 subtitle_key: "appearance_subtitle",
-                group: GROUP_OUTPUT,
+                group: TEST_GROUP,
             }
         }
 
@@ -534,9 +543,8 @@ mod tests {
 
     fn test_backend(rc_path: PathBuf, env_path: PathBuf) -> Backend {
         Backend {
-            id: "test",
             groups: vec![Group {
-                id: GROUP_OUTPUT,
+                id: TEST_GROUP,
                 label_key: "wlr_module",
             }],
             files: vec![

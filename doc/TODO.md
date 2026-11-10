@@ -4,8 +4,13 @@ No outstanding core tasks.
 
 ## Completed
 
-- Backend-oriented layout: `config/` contract, `backends/<id>/` adapters and pages,
-  compositor-neutral `pages/`, and `backends::detect()`/registry with `LXWC_BACKEND`.
+- Moved the live output page to `plugins/wlr_ui`; `wlr` is now an optional
+  prerequisite feature (`wlr-ui = ["wlr"]`) and the default build is unchanged.
+- Plugin model: everything optional lives in `plugins/` behind a `Plugin`
+  manifest (`provides`/`requires`/`pages`/`groups`), with `wlr` as a headless
+  provider and `wlr_ui` as a page plugin that consumes `core::outputs::Outputs`.
+  The registry disables plugins with unmet requirements and the shell-only build
+  (`--no-default-features`) runs without any backend.
 - `SettingsModule` takes `ConfigEdit.file_id` and a single `patch(file_id, raw)` hook;
   `app` aggregates one task per backend file instead of two hardcoded files.
 - Architecture tests enforce page/backend/adapter dependency directions.
